@@ -28,6 +28,7 @@ var wssvr = new WebSocketServer({
 var msg = null;
 var subId = null;
 
+//TODO: One WebSocket connection should have one IdTable. Currently only one global IdTable.
 var reqIdHash = {};
 var subIdHash = {};
 
@@ -69,17 +70,15 @@ wssvr.on('connection', function(ws) {
         clearInterval(timerId);
       }
       console.log("subscribe started. reqId=" + reqId + ", subId=" + subId + ", path=" + path + ", timer_Id=" + timerId);
-      //dispObject(sub_id);
 
     } else if (msg.action === "unsubscribe") {
       var subId = msg.subscriptionId;
       var reqId = getReqIdBySubId(subId);
       var timerId = getTimerIdByReqId(reqId);
-      console.log("unsubscribe id=" + subId);
-
+      var timestamp = new Date().getTime().toString(10);
       clearInterval(timerId);
       deleteSubscribeInfoFromIdTable(subId);
-      //dispObject(sub_id);
+      ws.send(JSON.stringify({"action": msg.action, "requestId":reqId, "subscriptionId":subId, "timestamp":timestamp}));
 
     } else if (msg.action === "set") {
       //TODO
@@ -184,7 +183,6 @@ function clearAllSubscribe() {
   console.log("clearAllSubscribe");
 
   for (var rid in reqIdHash) {
-    //var rid = keys[k];
     var obj = reqIdHash[rid];
     console.log("reqId=" + rid + " , subId="+obj.subId+", path="+obj.path+", timerId="+obj.timerId);
     var timerId = obj.timerId;
@@ -202,7 +200,6 @@ function createSubscribeNotificationJsonObj(reqId, subId, action, path, val) {
   // Adding timestamp at here is simple solution for prototype.
   // Real timestamp should be given from data source as the data's actual happening time.
   var timestamp = new Date().getTime().toString(10);
-  //console.log("timestamp="+timestamp);
   return {'action':action, 'requestId': reqId, 'subscriptionId':subId, 'path':path, 'timestamp':timestamp, 'value':val};
 }
 

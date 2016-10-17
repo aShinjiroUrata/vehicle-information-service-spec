@@ -3,25 +3,35 @@
 <head>
   <meta charset="UTF-8">
   <title>VSSS client</title>
+  <style>
+    div#msg { height:600px; width:1500px; background-color:lightgrey; font-size:14px;}
+    .val_area { height: 20px; width:150px; background-color:lightgrey; font-size:14px; display:inline-block;}
+    #server_info {height:20px; width:500px; font-size:13px;}
+  </style>
 </head>
 
 <body>
-  <br><button onclick="wsConnect();">ws connect</button>
-  <br><button onclick="wsDisconnect();">ws disconnect</button>
+  <h3> Vehicle Signal Server Spec Trial Implementaion </h3>
+  <span id="server_info"></span>
+  <br>
+  <br><button onclick="wsConnect();">ws connect</button><button onclick="wsDisconnect();">ws disconnect</button>
+  <span class="val_area" id="msg_connect"></span>
   <br>
   <br><button onclick="wsGetSpeed();">get speed</button>
-  <br><button onclick="wsGetEngineRPM();">get engine speed</button>
+  <span class="val_area" id="msg_get_speed" ></span>
+  <br><button onclick="wsGetEngineRPM();">get engine RPM</button>
+  <span class="val_area" id="msg_get_rpm"></span>
   <br><button onclick="wsGetSteeringAngle();">get steering angle</button>
+  <span class="val_area" id="msg_get_steer"></span>
   <br>
-  <br><button onclick="wsSubscribeSpeed();">subscribe speed</button>
-  <br><button onclick="wsUnsubscribeSpeed();">unsubscribe speed</button>
-  <br>
-  <br><button onclick="wsSubscribeEngineRpm();">subscribe engineRPM</button>
-  <br><button onclick="wsUnsubscribeEngineRpm();">unsubscribe engineRPM</button>
-  <br>
-  <br><button onclick="wsSubscribeSteerAngle();">subscribe steer angle</button>
-  <br><button onclick="wsUnsubscribeSteerAngle();">unsubscribe steer angle</button>
-
+  <br><button onclick="wsSubscribeSpeed();">subscribe speed</button><button onclick="wsUnsubscribeSpeed();">unsubscribe</button>
+  <span class="val_area" id="msg_sub_speed"></span>
+  <br><button onclick="wsSubscribeEngineRpm();">subscribe engine RPM</button><button onclick="wsUnsubscribeEngineRpm();">unsubscribe</button>
+  <span class="val_area" id="msg_sub_rpm"></span>
+  <br><button onclick="wsSubscribeSteerAngle();">subscribe steer angle</button><button onclick="wsUnsubscribeSteerAngle();">unsubscribe</button>
+  <span class="val_area" id="msg_sub_steer"></span>
+  <br><br>
+  <button onclick="clearMsgArea();">clearMsgArea</button>
   <div id="msg"></div>
   <script type="text/javascript">
     //TODO
@@ -39,7 +49,7 @@
 
     function wsConnect() {
       if (g_vehicle != null) {
-        "WebSocket already open";
+        console.log("WebSocket already open");
         return;
       }
       var url = "ws://" + WSSvrIP + ":" + WSSvrPort;
@@ -47,18 +57,26 @@
       g_vehicle.onopen = wsOnOpen;
       g_vehicle.onclose = wsOnClose;
       g_vehicle.onmessage = wsOnMessage;
+      showConnectMsg("WS Connected");
     }
     function wsDisconnect() {
+      if (g_vehicle === null) {
+        console.log("WebSocket not connected");
+        return;
+      }
       g_vehicle.close();
       g_vehicle = null;
       clearIdTable();
+      showConnectMsg("WS Disconnected");
     }
 
     function wsOnOpen() {
       console.log("Connection opened");
+      showInMsgArea("Connection opened");
     }
     function wsOnClose() {
       console.log("Connection closed");
+      showInMsgArea("Connection closed");
     }
     function wsOnMessage(event) {
       var msg = JSON.parse(event.data);
@@ -67,34 +85,43 @@
       // case of 'get'
       if (msg.action === "get") {
         console.log("get: "+"Value : " + msg.value + ", Path : " + msg.path);
+        showInMsgArea(" <== " + event.data);
+        showMsgByActionAndPath(msg.value, msg.action, msg.path);
 
       // case of 'subscribe'
       } else if (msg.action === "subscribe") {
         //console.log("onmessage: subscribe");
         if (isSubscribeSuccessResponse(msg)) {
           console.log("onmessage: SubscribeSuccessResponse");
+          showInMsgArea(" <== " + event.data);
           saveSubscriptionIdToIdTable(msg.requestId, msg.subscriptionId);
 
         } else if (isSubscribeErrorResponse(msg)) {
           console.log("onmessage: SubscribeErrorResponse");
+          showInMsgArea(" <== " + event.data);
           deleteSubscribeInfoFromIdTable(msg.requestId);
 
         } else if (isSubscriptionNotification(msg)) {
           //console.log("onmessage: SubscriptionNotification");
           console.log("sub: "+"Value : " + msg.value + ", Path : " + msg.path);
+          showInMsgArea(" <== " + event.data);
+          showMsgByActionAndPath(msg.value, msg.action, msg.path);
 
         } else if (isSubscriptionNotificationError(msg)) {
           console.log("onmessage: SubscriptionNotificationError");
+          showInMsgArea(" <== " + event.data);
           // ここは何をする？これはどういう場合に発生する？
           // これが発生したらsubscribeをcancelすることは必要？
           // should I unsbscribe here?
         } else {
           console.log("onmessage: Subscribe: Others");
+          showInMsgArea(" <== " + event.data);
         }
 
       // case of 'unsubscribe'
       } else if (msg.action === "unsubscribe") {
         console.log("onmessage: unsubscribe");
+        showInMsgArea(" <== " + event.data);
         deleteSubscribeInfoFromIdTable(msg.requestId, msg.subscriptionId);
 
       // TODO: set, authorize, getVSS
@@ -107,19 +134,25 @@
     // === get ===
     function wsGetSpeed() {
       if (g_vehicle != null && g_vehicle.readyState === 1) {
-        g_vehicle.send(JSON.stringify({"action": "get", "path": "Signal.Drivetrain.Transmission.Speed"}));
+        var json_str = JSON.stringify({"action": "get", "path": "Signal.Drivetrain.Transmission.Speed"});
+        g_vehicle.send(json_str);
+        showInMsgArea(" ==> " + json_str);
       }
     }
     //Signal.Drivetrain.InternalCombustionEngine.RPM
     function wsGetEngineRPM() {
       if (g_vehicle != null && g_vehicle.readyState === 1) {
-        g_vehicle.send(JSON.stringify({"action": "get", "path": "Signal.Drivetrain.InternalCombustionEngine.RPM"}));
+        var json_str = JSON.stringify({"action": "get", "path": "Signal.Drivetrain.InternalCombustionEngine.RPM"});
+        g_vehicle.send(json_str);
+        showInMsgArea(" ==> " + json_str);
       }
     }
     //Signal.Chassis.SteeringWheel.Angle
     function wsGetSteeringAngle() {
       if (g_vehicle != null && g_vehicle.readyState === 1) {
-        g_vehicle.send(JSON.stringify({"action": "get", "path": "Signal.Chassis.SteeringWheel.Angle"}));
+        var json_str = JSON.stringify({"action": "get", "path": "Signal.Chassis.SteeringWheel.Angle"});
+        g_vehicle.send(json_str);
+        showInMsgArea(" ==> " + json_str);
       }
     }
 
@@ -129,7 +162,10 @@
         //g_reqId = getUniqueReqId();
         //var path = "Signal.Drivetrain.Transmission.Speed";
         console.log("reqId = " + reqId);
-        g_vehicle.send(JSON.stringify({"action": "subscribe", "path": path, "requestId":reqId}));
+        showInMsgArea("reqId = " + reqId);
+        var json_str = JSON.stringify({"action": "subscribe", "path": path, "requestId":reqId});
+        g_vehicle.send(json_str);
+        showInMsgArea(" ==> " + json_str);
         addSubscribeInfoToIdTable(reqId, path);
         return true;
       } else {
@@ -139,14 +175,17 @@
     function wsUnsubscribeItem(path, reqId) {
       if (g_vehicle != null && g_vehicle.readyState === 1) {
         var subId = getSubIdByReqId(reqId);
-        g_vehicle.send(JSON.stringify({"action": "unsubscribe", "path": path
-                                    ,"requestId":reqId, "subscriptionId":subId}));
+        var json_str = JSON.stringify({"action": "unsubscribe", "path": path
+                                       ,"requestId":reqId, "subscriptionId":subId});
+        g_vehicle.send(json_str);
+        showInMsgArea(" ==> " + json_str);
       }
     }
 
     function wsSubscribeSpeed() {
       if (g_speedReqId != null) {
         console.log("Speed is already subscribed");
+        showInMsgArea("Speed is already subscribed");
         return;
       }
       g_speedReqId = getUniqueReqId();
@@ -163,6 +202,7 @@
     function wsSubscribeEngineRpm() {
       if (g_engineRpmReqId != null) {
         console.log("EngineRpm is already subscribed");
+        showInMsgArea("EngineRpm is already subscribed");
         return;
       }
       g_engineRpmReqId = getUniqueReqId();
@@ -178,6 +218,7 @@
     function wsSubscribeSteerAngle() {
       if (g_steerAngleReqId != null) {
         console.log("Steering Angle is already subscribed");
+        showInMsgArea("Steering Angle is already subscribed");
         return;
       }
       g_steerAngleReqId = getUniqueReqId();
@@ -246,20 +287,24 @@
       // TODO: 不具合ケースの考慮が不十分
       if (reqIdHash[reqId] != undefined) {
         console.log("Error: requestId already used. reqId="+reqId);
+        showInMsgArea("Error: requestId already used. reqId="+reqId);
         return false;
       }
       reqIdHash[reqId] = {'subId':0, 'path':path};
       console.log("addSubscribeInfoToIdTable: EntryNum=" + Object.keys(reqIdHash).length);
+      //showInMsgArea("addSubscribeInfoToIdTable: EntryNum=" + Object.keys(reqIdHash).length);
       return true;
     }
     function saveSubscriptionIdToIdTable(reqId, subId) {
       // TODO: 不具合ケースの考慮が不十分
       if (reqIdHash[reqId] == undefined) {
         console.log("Error: this requestId entry not exits. reqId="+reqId);
+        showInMsgArea("Error: this requestId entry not exits. reqId="+reqId);
         return false;
       }
       if (subIdHash[subId] != undefined) {
         console.log("Error: this subscriptionId already used. subId="+subId);
+        showInMsgArea("Error: this subscriptionId already used. subId="+subId);
         return false;
       }
       reqIdHash[reqId].subId = subId;
@@ -284,16 +329,20 @@
       if (subId != undefined)
         delete subIdHash[subId];
       console.log("deleteSubscribeInfoFromIdTable: entry deleted. reqId="+reqId+" ,subId="+subId);
+      //showInMsgArea("deleteSubscribeInfoFromIdTable: entry deleted. reqId="+reqId+" ,subId="+subId);
     }
 
     function clearIdTable() {
       console.log("clearIdTable");
+      showInMsgArea("clearIdTable");
       for (var i in reqIdHash) {
         console.log("delete : " + i);
+        showInMsgArea("delete : " + i);
         delete reqIdHash[i];
       }
       for (var i in subIdHash) {
         console.log("delete : " + i);
+        showInMsgArea("delete : " + i);
         delete subIdHash[i];
       }
       g_speedReqId = null;
@@ -310,6 +359,61 @@
       var uniq = new Date().getTime().toString(16) + Math.floor(strength*Math.random()).toString(16);
       return "reqid-"+uniq;
     }
+
+    function showInMsgArea(msgText) {
+      var targ = document.getElementById('msg');
+      var oldText = targ.innerHTML;
+      oldText = oldText.substring(0, 5000);
+      var newText = msgText + "<br>" + oldText;
+      targ.innerHTML = newText;
+    }
+
+    function showMsgById(msgText, idTarg) {
+      var targ = document.getElementById(idTarg);
+      targ.innerHTML = msgText;
+    }
+
+    function showMsgByActionAndPath(value, action, path) {
+      var targ_id = null;
+      if (path === "Signal.Drivetrain.Transmission.Speed" ) {
+        if (action === "get")
+          targ_id = "msg_get_speed";
+        else if (action === "subscribe")
+          targ_id = "msg_sub_speed";
+
+      } else if (path === "Signal.Drivetrain.InternalCombustionEngine.RPM" ) {
+        if (action === "get")
+          targ_id = "msg_get_rpm";
+        else if (action === "subscribe")
+          targ_id = "msg_sub_rpm";
+      } else if (path === "Signal.Chassis.SteeringWheel.Angle" ) {
+        if (action === "get")
+          targ_id = "msg_get_steer";
+        else if (action === "subscribe")
+          targ_id = "msg_sub_steer";
+      }
+      var targ = document.getElementById(targ_id);
+      targ.innerHTML = value;
+    }
+
+    function showConnectMsg(msgText) {
+      var targ = document.getElementById('msg_connect');
+      targ.innerHTML = msgText;
+    }
+    function clearMsgArea() {
+      var targ = document.getElementById('msg');
+      targ.innerHTML = "";
+    }
+
+    (function init() {
+      var svr_area = document.getElementById("server_info");
+      svr_area.innerHTML = "Server IP:" + WSSvrIP + "  WebSocket Port:" + WSSvrPort;
+
+      var msg_areas = document.getElementsByClassName("val_area");
+      for (var i=0; i<msg_areas.length; i++) {
+        msg_areas.item(i).innerHTML = "---";
+      }
+    })();
 
   </script>
 </body>
