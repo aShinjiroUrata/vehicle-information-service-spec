@@ -10,7 +10,9 @@ var WSSvrIP = '10.5.162.79';
 var HttpSvrPort = 8070;
 var WSSvrPort = 8071;
 
+// =========================
 // == Publish client.html ==
+// =========================
 var fs = require('fs');
 var httpsvr = require('http').createServer(function(req, res) {
   res.writeHead(200, {"Content-Type":"text/html"});
@@ -18,73 +20,178 @@ var httpsvr = require('http').createServer(function(req, res) {
   res.end(output);
 }).listen(HttpSvrPort);
 
+// ===========================
 // == Start WebSocketServer ==
+// ===========================
 var WebSocketServer = require('ws').Server;
 var wssvr = new WebSocketServer({
   host : WSSvrIP,
   port : WSSvrPort
 });
 
-var msg = null;
-var subId = null;
-
 //TODO: One WebSocket connection should have one IdTable. Currently only one global IdTable.
-var reqIdHash = {};
-var subIdHash = {};
+
+// =========================
+// == define RequestTable ==
+// =========================
+// memo:
+// 当面はsubscribeの情報のみ格納するが
+// 先々は、get, setなども格納が必要になりそう
+// DataBrokerからのデータを待つ仕組みにする想定のため
+var g_reqTable = {
+  requestHash: {},
+  subIdHash: {},
+
+  //TODO: 要テスト
+  addReqToTable: function(reqObj, subId, timerId) {
+    var reqId = reqObj.requestId;
+    console.log("addReqToTable: reqId="+reqId);
+    if (this.requestHash[reqId] != undefined) {
+      console.log("  :Error: requestId already used. reqId="+reqId);
+      return false;
+    }
+    this.requestHash[reqId] = reqObj;
+
+    //subscribeの場合subIdHashにも登録する
+    if (reqObj.action == "subscribe") {
+      if (subId != undefined && this.subIdHash[subId] == undefined) {
+        console.log("  :action="+reqObj.action+". adding subId="+subId);
+        this.requestHash[reqId].subcriptionId = subId;
+        this.subIdHash[subId] = reqId;
+      } else {
+        console.log("  :action="+reqObj.action+". not adding subId="+subId);
+      }
+      if (timerId != undefined) {
+        console.log("  :action="+reqObj.action+". adding timerId="+subId);
+        this.requestHash[reqId].timerId = timerId;
+      }
+    }
+
+    console.log("  :EntryNum=" + Object.keys(this.requestHash).length);
+    this.dispReqIdHash();
+
+    return true;
+  },
+  delReqByReqId: function(reqId) {
+    console.log("delReqByReqId: reqId = " + reqId);
+    if (this.requestHash[reqId] == undefined) {
+      console.log("  :delReqByReqId: entry is not found. reqId = " + reqId);
+      return false;
+    }
+    var subId = this.requestHash[reqId].subscriptionId;
+    delete this.requestHash[reqId];
+    if (subId != undefined)
+      delete this.subIdHash[subId];
+    console.log("  :EntryNum=" + Object.keys(this.requestHash).length);
+  },
+  clearReqTable: function() {
+    console.log("clearReqTable");
+
+    for (var rid in this.requestHash) {
+      var obj = this.requestHash[rid];
+      console.log("  :reqId=" + obj.requestId + " , subId="+obj.subscriptionId+", path="
+                  +obj.path+", timerId="+obj.timerId);
+      var timerId = obj.timerId;
+      clearInterval(timerId);
+    }
+    for (var rid in this.requestHash) {
+      delete this.requestHash[rid];
+    }
+    for (var sid in this.subIdHash) {
+      delete this.subIdHash[sid];
+    }
+  },
+  getReqIdBySubId: function(subId) {
+    var reqId = this.subIdHash[subId];
+    if (reqId == undefined) return null;
+    return reqId;
+  },
+  getSubIdByReqId: function(reqId) {
+    var obj = this.requestHash[reqId];
+    if (obj == undefined) return null;
+    return obj.subscriptionId;
+  },
+  getTimerIdByReqId: function(reqId) {
+    console.log("getTimerIdByReqId: reqId="+reqId);
+    var obj = this.requestHash[reqId];
+    if (obj == undefined) {
+      console.log("  :getTimerIdByReqId: object not found.");
+      return null;
+    }
+    console.log("  :timerId = " + obj.timerId);
+    return obj.timerId;
+  },
+  dispReqIdHash: function() {
+    console.log("dispReqIdHash:");
+    for (var rid in this.requestHash) {
+      var obj = this.requestHash[rid];
+      console.log("  :reqid=" + obj.requestId + " , subid="+obj.subscriptionId
+                  +", path="+obj.path+", timerid="+obj.timerid);
+    }
+  }
+};
 
 wssvr.on('connection', function(ws) {
-  console.log('ws connected');
+  console.log('ws.on:connection');
   ws.on('message', function(message) {
-    msg = JSON.parse(message);
-    console.log("ws.on-message: msg= " + message);
+    var obj = JSON.parse(message);
+    console.log("ws.on:message: obj= " + message);
+    console.log("  :action=" + obj.action);
 
     // for 'get'
-    if (msg.action === "get") {
-      var val = getValueByPath(msg.path);
+    if (obj.action === "get") {
+      var val = getValueByPath(obj.path);
       var timestamp = new Date().getTime().toString(10);
-      ws.send(JSON.stringify({"action": msg.action, "path": msg.path, "value": val, "timestamp":timestamp}));
+      var resObj = {"action": obj.action, "path": obj.path, "requestId": obj.requestId,
+                    "value": val, "timestamp":timestamp};
+      ws.send(JSON.stringify(resObj));
 
     // for 'subscribe'
-    } else if (msg.action === "subscribe") {
-      var reqId = msg.requestId;
-      var path = msg.path;
-      var action = msg.action;
-      //var filter = msg.filter;
+    } else if (obj.action === "subscribe") {
+      var reqId = obj.requestId;
+      var path = obj.path;
+      var action = obj.action;
+      //var filter = obj.filter;
 
       var subId = getUniqueSubId();
 
       // return 'subscribeSuccessResponse'
-      ws.send(JSON.stringify({"action": action, "requestId": reqId, "subscriptionId": subId}));
+      var resObj = {"action": action, "requestId": reqId, "subscriptionId": subId};
+      ws.send(JSON.stringify(resObj));
 
       // start interval timer for 'subscriptionNotification'
       var timerId =  setInterval(function(reqId, subId, action, path) {
                   var val = getValueByPath(path);
                   var obj = createSubscribeNotificationJsonObj(reqId, subId, action, path, val);
-                  console.log("subscribe:send : " + JSON.stringify(obj));
+                  console.log("  :subscribe:send : " + JSON.stringify(obj));
                   ws.send(JSON.stringify(obj));
-                }, 500, reqId, subId, msg.action, msg.path);
+                }, 500, reqId, subId, obj.action, obj.path);
 
-      var ret = addSubscribeInfoToIdTable(reqId, subId, path, timerId);
+      var ret = g_reqTable.addReqToTable(obj, subId, timerId);
       if (ret == false) {
-        console.log("Failed to add subscribe info to IdTable. Cancel the timer.");
+        console.log("  :Failed to add subscribe info to IdTable. Cancel the timer.");
         clearInterval(timerId);
       }
-      console.log("subscribe started. reqId=" + reqId + ", subId=" + subId + ", path=" + path + ", timer_Id=" + timerId);
+      console.log("  :subscribe started. reqId=" + reqId + ", subId=" + subId + ", path="
+                  + path + ", timer_Id=" + timerId);
 
-    } else if (msg.action === "unsubscribe") {
-      var subId = msg.subscriptionId;
-      var reqId = getReqIdBySubId(subId);
-      var timerId = getTimerIdByReqId(reqId);
+    } else if (obj.action === "unsubscribe") {
+      var reqId = obj.requestId; // unsub requestのreqId
+      var targ_subId = obj.subscriptionId; // subscribe のsubId
+      var targ_reqId = g_reqTable.getReqIdBySubId(targ_subId); // subscribeのreqId
+      var timerId = g_reqTable.getTimerIdByReqId(targ_reqId);
       var timestamp = new Date().getTime().toString(10);
       clearInterval(timerId);
-      deleteSubscribeInfoFromIdTable(subId);
-      ws.send(JSON.stringify({"action": msg.action, "requestId":reqId, "subscriptionId":subId, "timestamp":timestamp}));
+      g_reqTable.delReqByReqId(targ_reqId); // subscribeのentryを削除
+      var resObj = {"action": obj.action, "requestId":reqId, "subscriptionId":targ_subId,
+                    "timestamp":timestamp};
+      ws.send(JSON.stringify(resObj));
 
-    } else if (msg.action === "set") {
+    } else if (obj.action === "set") {
       //TODO
-    } else if (msg.action === "authorize") {
+    } else if (obj.action === "authorize") {
       //TODO
-    } else if (msg.action === "getVSS") {
+    } else if (obj.action === "getVSS") {
       //TODO
     } else {
       //Do nothing
@@ -93,8 +200,8 @@ wssvr.on('connection', function(ws) {
   });
 
   ws.on('close', function() {
-    console.log('ws closed');
-    clearAllSubscribe();
+    console.log('ws.on:closed');
+    g_reqTable.clearReqTable();
   });
 });
 
@@ -127,90 +234,16 @@ function getValueByPath(path) {
   return ret;
 }
 
-// == subscribe helper funcs ==
-function addSubscribeInfoToIdTable(reqId, subId, path, timerId) {
-  if (reqIdHash[reqId] != undefined) {
-    console.log("Error: requestId already used. reqId="+reqId);
-    return false;
-  }
-  if (subIdHash[subId] != undefined) {
-    console.log("Error: this subscriptionId already used. subId="+subId);
-    return false;
-  }
-  reqIdHash[reqId] = {'subId':subId, 'timerId':timerId, 'path':path};
-  subIdHash[subId] = reqId; // for cross reference
-
-  console.log("addSubscribeInfoToIdTable: EntryNum=" + Object.keys(reqIdHash).length);
-  dispReqIdHash();
-
-  return true;
-}
-
-function getReqIdBySubId(subId) {
-  var id = subIdHash[subId];
-  if (id == undefined) return null;
-  return id;
-}
-function getSubIdByReqId(reqId) {
-  var obj = reqIdHash[reqId];
-  if (obj == undefined) return null;
-  return obj.subId;
-}
-
-function getTimerIdByReqId(reqId) {
-  var obj = reqIdHash[reqId];
-  if (obj == undefined) return null;
-  return obj.timerId;
-}
-
-function deleteSubscribeInfoFromIdTable(subId) {
-  var reqId = subIdHash[subId];
-  delete reqIdHash[reqId];
-  delete subIdHash[subId];
-  console.log("deleteSubscribeInfoFromIdTable : EntryNum=" + Object.keys(reqIdHash).length);
-}
-
-function dispReqIdHash() {
-  console.log("dispReqIdHash");
-
-  for (var rid in reqIdHash) {
-    var obj = reqIdHash[rid];
-    console.log("reqId=" + rid + " , subId="+obj.subId+", path="+obj.path+", timerId="+obj.timerId);
-  }
-}
-
-function clearAllSubscribe() {
-  console.log("clearAllSubscribe");
-
-  for (var rid in reqIdHash) {
-    var obj = reqIdHash[rid];
-    console.log("reqId=" + rid + " , subId="+obj.subId+", path="+obj.path+", timerId="+obj.timerId);
-    var timerId = obj.timerId;
-    clearInterval(timerId);
-  }
-  for (var rid in reqIdHash) {
-    delete reqIdHash[rid];
-  }
-  for (var sid in subIdHash) {
-    delete subIdHash[sid];
-  }
-}
-
-function createSubscribeNotificationJsonObj(reqId, subId, action, path, val) {
-  // Adding timestamp at here is simple solution for prototype.
-  // Real timestamp should be given from data source as the data's actual happening time.
-  var timestamp = new Date().getTime().toString(10);
-  return {'action':action, 'requestId': reqId, 'subscriptionId':subId, 'path':path, 'timestamp':timestamp, 'value':val};
-}
-
+// ===================
 // == Utility funcs ==
+// ===================
 function dispObject(obj) {
-  console.log("obj props:");
+  console.log("dispObject:");
+  console.log("  :obj props:");
   for(var n in obj){
-    console.log("==> " + n + " : " + obj[n] );
+    console.log("  :==> " + n + " : " + obj[n] );
   }
 }
-
 function getUniqueSubId() {
   // create semi-uniquID (for implementation easyness) as timestamp(milli sec)+random string
   // uniqueness is not 100% guaranteed.
@@ -218,4 +251,11 @@ function getUniqueSubId() {
   var uniq = new Date().getTime().toString(16) + Math.floor(strength*Math.random()).toString(16);
   return "subid-"+uniq;
 }
+function createSubscribeNotificationJsonObj(reqId, subId, action, path, val) {
+  // Adding timestamp at here is simple solution for prototype.
+  // Real timestamp should be given from data source as the data's actual happening time.
+  var timestamp = new Date().getTime().toString(10);
+  return {'action':action, 'requestId': reqId, 'subscriptionId':subId, 'path':path, 'timestamp':timestamp, 'value':val};
+}
+
 
