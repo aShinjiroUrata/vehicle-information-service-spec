@@ -103,17 +103,19 @@
     },
 
     getReqByReqId: function(reqId) {
+      showInMsgArea("getReqByReqId: reqId="+reqId);
       if (this.requestHash[reqId] == undefined) return false;
       return this.requestHash[reqId];
     },
 
     getReqBySubId: function(subId) {
+      showInMsgArea("getReqBySubId: subId="+subId);
       // subscribeとunsubは同じsubIdを使用する
       // 一つのsubIdでsubIdHashに2件登録されるのは不都合。
       // unsubのエントリはsubIdHashに登録する必要はなさそうなのでそうしてみる
       var reqId = this.subIdHash[subId];
       if (reqId == undefined) return false;
-      getReqByReqId(reqId);
+      return this.getReqByReqId(reqId);
     },
 
     setSubIdToReq: function(reqId, subId) {
@@ -130,7 +132,9 @@
         return false;
       }
       this.requestHash[reqId].subscriptionId = subId;
+      this.dispRequestHash();
       this.subIdHash[subId] = reqId; // for cross reference.
+      this.dispSubIdHash();
       return true;
     },
     getSubIdByReqId: function(rId) {
@@ -155,6 +159,18 @@
       }
       g_ui.clearSubscribeBtnLockAll();
     },
+    dispRequestHash: function() {
+      showInMsgArea("dispRequestHash:");
+      for (var i in this.requestHash) {
+        showInMsgArea("--:reqId="+i+", req="+JSON.stringify(this.requestHash[i]));
+      }
+    },
+    dispSubIdHash: function() {
+      showInMsgArea("dispSubIdHash:");
+      for (var i in this.subIdHash) {
+        showInMsgArea("--:subId="+i+", reqId="+this.subIdHash[i]);
+      }
+    }
   };
 
   // ===================
@@ -169,6 +185,7 @@
 
   function onWsMessage(event) {
     showInMsgArea("onWsMessage: ");
+    showInMsgArea("--: <== " + event.data);
 
     var msg = JSON.parse(event.data);
     var reqObj=null, action=null, reqId=null, subId=null;
@@ -184,8 +201,7 @@
 
     // case of 'get'
     if (action === "get") {
-      showInMsgArea("--: <== " + event.data);
-      showMsgByActionAndPath(msg.value, msg.action, msg.path);
+      showMsgByActionAndPath(msg.value, reqObj.action, reqObj.path);
       // delete request from requestHash. delete even in error case
       g_reqTable.delReqByReqId(reqId);
     // case of 'set'
@@ -203,14 +219,12 @@
         // subscribeSuccessResponseの場合
         // subIdをrequestTableに追加する
         //showInMsgArea("--:msgtype: SubscribeSuccessResponse");
-        showInMsgArea("--: <== " + event.data);
         g_reqTable.setSubIdToReq(msg.requestId, msg.subscriptionId);
 
       } else if (isSubscribeErrorResponse(msg)) {
         // subscribeErrorRespの場合
         // subscribe失敗したので、requestTalbeからエントリ削除
         //showInMsgArea("--:msgtype: SubscribeErrorResponse");
-        showInMsgArea("--: <== " + event.data);
         g_reqTable.delReqByReqId(msg.requestId);
 
       } else if (isSubscriptionNotification(msg)) {
@@ -218,18 +232,15 @@
         // subIdしか持っていない
         // valueの通知を受けてハンドラに引き渡す
         //showInMsgArea("--:msgtype: SubscriptionNotification");
-        showInMsgArea("--: <== " + event.data);
         // notification で valueが通知されたので表示する
-        showMsgByActionAndPath(msg.value, msg.action, msg.path);
+        showMsgByActionAndPath(msg.value, reqObj.action, reqObj.path);
 
       } else if (isSubscriptionNotificationError(msg)) {
         //showInMsgArea("--:msgtype: SubscriptionNotificationError");
-        showInMsgArea("--: <== " + event.data);
         // noting to do special here. continu subscribe.
       } else {
         // ここには来ないはず
         //showInMsgArea("--:msgtype: Subscribe: Unknown");
-        showInMsgArea("--: <== " + event.data);
       }
 
     // case of 'unsubscribe'
@@ -238,7 +249,6 @@
       // ただし、subIdは、subscribeとunsubscribeで同じものを使用する
       // つまり、g_reqTableのなかでsubIdはuniqueではない
 
-      showInMsgArea("--: <== " + event.data);
       if (msg.error != undefined) {
         // unsub失敗。unsubのリクエスト削除は行う
         // subscribeのリクエストは削除しない
@@ -318,7 +328,7 @@
   function wsSubscribeItem(path, reqId) {
     showInMsgArea("wsSubscribeItem: reqId = " + reqId);
     if (g_vehicle != null && g_vehicle.readyState === 1) {
-      var req ={"action": "subscribe", "path": path, "requestId":reqId};
+      var req ={"action": "subscribe", "path": path, "filters":"", "requestId":reqId};
       var json_str = JSON.stringify(req);
       g_vehicle.send(json_str);
       showInMsgArea("--: ==> " + json_str);
@@ -332,7 +342,7 @@
     showInMsgArea("wsUnsubscribeItem: subId=" + subId);
     if (g_vehicle != null && g_vehicle.readyState === 1) {
       var reqId = getUniqueReqId(); //reqIdはunsub用に新しいものを使用
-      var req = {"action": "unsubscribe", "path": path, "requestId":reqId, "subscriptionId":subId};
+      var req = {"action": "unsubscribe", "requestId":reqId, "subscriptionId":subId};
       var json_str = JSON.stringify(req);
       g_vehicle.send(json_str);
       showInMsgArea("--: ==> " + json_str);
@@ -395,12 +405,11 @@
 
   // == subscribe helper funcs ==
   // to detect type of Json message
-  // TODO:このType判定は見直す
   function isSubscribeSuccessResponse(msg) {
     // This is subscribeSuccessResponse if ...
-    // following members exist    : action, requestId, subscriptionId
-    // following members not exist: error, value
-    if (msg.action != undefined && msg.requestId != undefined && msg.subscriptionId != undefined && 
+    // must exist    : (action), requestId, subscriptionId, (timestamp)
+    // must not exist: error, value
+    if (msg.action === "subscribe" && msg.requestId != undefined && msg.subscriptionId != undefined &&
         msg.error == undefined && msg.value == undefined)
       return true;
     else
@@ -408,10 +417,10 @@
   }
   function isSubscribeErrorResponse(msg) {
     // This is subscribeErrorResponse if ...
-    // following members exist    : path, requestId, error
-    // following members not exist: subscriptionId
+    // must exist    : (path), requestId, error,(timestamp)
+    // must not exist: (action), subscriptionId, value
     if (msg.path != undefined && msg.requestId != undefined && msg.error != undefined && 
-        msg.subscriptionId == undefined)
+        msg.action == undefined && msg.subscriptionId == undefined && msg.value == undefined)
       return true;
     else
       return false;
@@ -419,22 +428,20 @@
   }
   function isSubscriptionNotification(msg) {
     // This is subscriptionNotification if ..
-    // following members exist    : requestId, subscriptionId, path, timestamp, value
-    // following members not exist: error
-    if (msg.requestId != undefined && msg.subscriptionId != undefined && msg.path != undefined &&
-        //msg.timestamp != undefined && 
-        msg.value != undefined && msg.error == undefined)
+    // must exist    : subscriptionId, (path), value, (timestamp)
+    // must not exist: error, (requestId), (action)
+    if (msg.subscriptionId != undefined && msg.value != undefined &&
+        msg.error == undefined)
       return true;
     else
       return false;
   }
   function isSubscriptionNotificationError(msg) {
     // This is subscriptionNotificationError if ..
-    // following members exist    : requestId, subscriptionId, path, timestamp, error
-    // following members not exist: value
-    if (msg.requestId != undefined && msg.subscriptionId != undefined && msg.path != undefined &&
-        //msg.timestamp != undefined && 
-        msg.error != undefined && msg.value != undefined)
+    // following members exist    : subscriptionId, (path), error, (filters), (timestamp)
+    // following members not exist: value, (requestId), (action)
+    if (msg.subscriptionId != undefined && msg.error != undefined &&
+        msg.value == undefined)
       return true;
     else
       return false;

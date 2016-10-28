@@ -255,7 +255,9 @@ function createSubscribeNotificationJsonObj(reqId, subId, action, path, val) {
   // Adding timestamp at here is simple solution for prototype.
   // Real timestamp should be given from data source as the data's actual happening time.
   var timestamp = new Date().getTime().toString(10);
-  return {'action':action, 'requestId': reqId, 'subscriptionId':subId, 'path':path, 'timestamp':timestamp, 'value':val};
+  var retObj = {'subscriptionId':subId, 'path':path, 'value':val, 'timestamp':timestamp};
+
+  return retObj;
 }
 
 
