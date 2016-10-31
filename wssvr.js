@@ -140,10 +140,12 @@ wssvr.on('connection', function(ws) {
 
     // for 'get'
     if (obj.action === "get") {
+      var reqId = obj.requestId;
       var val = getValueByPath(obj.path);
       var timestamp = new Date().getTime().toString(10);
-      var resObj = {"action": obj.action, "path": obj.path, "requestId": obj.requestId,
-                    "value": val, "timestamp":timestamp};
+      //var resObj = {"action": obj.action, "path": obj.path, "requestId": obj.requestId,
+      //              "value": val, "timestamp":timestamp};
+      var resObj = createGetSuccessResponseJson(reqId, val, timestamp);
       ws.send(JSON.stringify(resObj));
 
     // for 'subscribe'
@@ -154,15 +156,16 @@ wssvr.on('connection', function(ws) {
       //var filter = obj.filter;
 
       var subId = getUniqueSubId();
-
+      var timestamp = new Date().getTime().toString(10);
       // return 'subscribeSuccessResponse'
-      var resObj = {"action": action, "requestId": reqId, "subscriptionId": subId};
+      //var resObj = {"action": action, "requestId": reqId, "subscriptionId": subId};
+      var resObj = createSubscribeSuccessResponseJson(action, reqId, subId, timestamp);
       ws.send(JSON.stringify(resObj));
 
       // start interval timer for 'subscriptionNotification'
       var timerId =  setInterval(function(reqId, subId, action, path) {
                   var val = getValueByPath(path);
-                  var obj = createSubscribeNotificationJsonObj(reqId, subId, action, path, val);
+                  var obj = createSubscribeNotificationJson(reqId, subId, action, path, val);
                   console.log("  :subscribe:send : " + JSON.stringify(obj));
                   ws.send(JSON.stringify(obj));
                 }, 500, reqId, subId, obj.action, obj.path);
@@ -251,7 +254,25 @@ function getUniqueSubId() {
   var uniq = new Date().getTime().toString(16) + Math.floor(strength*Math.random()).toString(16);
   return "subid-"+uniq;
 }
-function createSubscribeNotificationJsonObj(reqId, subId, action, path, val) {
+
+//====================
+// == JSON Creation ==
+// ===================
+function createGetSuccessResponseJson(reqId, value, timestamp) {
+//function createGetSuccessResponseJsonObj(action, path, reqId, value, timestamp) {
+  //var retObj = {"action": action, "path": path, "requestId": reqId,
+  //              "value": value, "timestamp":timestamp};
+  var retObj = {"requestId": reqId, "value": value, "timestamp":timestamp};
+  return retObj;
+}
+
+function createSubscribeSuccessResponseJson(action, reqId, subId, timestamp) {
+  var retObj = {"action":action, "requestId":reqId, "subscriptionId":subId, 
+                "timestamp":timestamp};
+  return retObj;
+}
+
+function createSubscribeNotificationJson(reqId, subId, action, path, val) {
   // Adding timestamp at here is simple solution for prototype.
   // Real timestamp should be given from data source as the data's actual happening time.
   var timestamp = new Date().getTime().toString(10);
