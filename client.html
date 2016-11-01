@@ -103,13 +103,13 @@
     },
 
     getReqByReqId: function(reqId) {
-      showInMsgArea("getReqByReqId: reqId="+reqId);
+      //showInMsgArea("getReqByReqId: reqId="+reqId);
       if (this.requestHash[reqId] == undefined) return false;
       return this.requestHash[reqId];
     },
 
     getReqBySubId: function(subId) {
-      showInMsgArea("getReqBySubId: subId="+subId);
+      //showInMsgArea("getReqBySubId: subId="+subId);
       // subscribeとunsubは同じsubIdを使用する
       // 一つのsubIdでsubIdHashに2件登録されるのは不都合。
       // unsubのエントリはsubIdHashに登録する必要はなさそうなのでそうしてみる
@@ -132,9 +132,9 @@
         return false;
       }
       this.requestHash[reqId].subscriptionId = subId;
-      this.dispRequestHash();
+      //this.dispRequestHash();
       this.subIdHash[subId] = reqId; // for cross reference.
-      this.dispSubIdHash();
+      //this.dispSubIdHash();
       return true;
     },
     getSubIdByReqId: function(rId) {
