@@ -29,6 +29,33 @@ var wssvr = new WebSocketServer({
   port : WSSvrPort
 });
 
+// ===============================================
+// == Connect to external dataSrc via WebSocket ==
+// ===============================================
+// * Connect as client
+var DataSrcIP = '10.5.162.79';
+var DataSrcPort = 8072;
+var dataSrcUrl = "ws://" + DataSrcIP + ":" + DataSrcPort;
+var WebSocketClient = require('websocket').client;
+var g_dataSrc = new WebSocketClient();
+
+g_dataSrc.on('connect', function(conn) {
+  console.log('Connected to DataSrc');
+  conn.on('error', function(err) {
+    console.log("dataSrc on error ");
+  });
+  conn.on('close', function() {
+    console.log("dataSrc on close ");
+  });
+  conn.on('message', function(msg) {
+    //console.log("dataSrc on message :");
+    if (msg.type === 'utf8') {
+      dataReceiveHandler(msg.utf8Data);
+    }
+  });
+});
+g_dataSrc.connect(dataSrcUrl,'');
+
 //TODO: One WebSocket connection should have one IdTable. Currently only one global IdTable.
 
 // =========================
@@ -224,12 +251,13 @@ wssvr.on('connection', function(ws) {
 
 // dataSrcからのWebSocketメッセージ受信は以下で処理する想定
 
-// this is test func to use instead of real websocket's on message
+// WebSocketで外部のdataSrcからデータを受信する代わりに
+// タイマーでダミーdataSrcからの受信イベントを発生させる
 function dummySrc_ReceiveData() {
   setInterval(function() {
     // receive data Json
     var msg = receiveDataSrcJson();
-    dummySrc_MsgHandler(msg);
+    dataReceiveHandler(msg);
   }, 1000);
 }
 
@@ -272,8 +300,8 @@ function matchPath(path, dataObj) {
   }
 }
 
-function dummySrc_MsgHandler(message) {
-  //console.log("dummySrc_MsgHandler: ");
+function dataReceiveHandler(message) {
+  console.log("dataReceiveHandler: ");
   //ここのmessageは、ZMPのJSONフォーマットで来る想定
   var obj = JSON.parse(message);
   var dataObj;
@@ -343,7 +371,7 @@ function getValueByPath(path) {
 }
 
 // Run dummy data source
-dummySrc_ReceiveData();
+//dummySrc_ReceiveData();
 
 // ===================
 // == Utility funcs ==
