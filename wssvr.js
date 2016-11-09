@@ -2,10 +2,25 @@
 // * npm install ws
 // * node wssvr.js
 // * open with browser: http://10.5.162.79:8070
+// * to use ext mock server, run the mock server by
+// * * node datasrc.js
+// * to use ext SIP hackathon server,
+// * * run hackathon server
+// * * submit roomID='room01'
+// * * select drive data and start to play the data
 
 "use strict"
 
-// == Set Server IP and Port Number here ==
+// == data source selection ==
+var LOCAL_MOCK_DATA = 0;
+var EXT_MOCK_SERVER = 1;
+var EXT_HACKATHON_SERVER = 2;
+// Please select dataSrc from above options
+//var dataSrc = LOCAL_MOCK_DATA;
+//var dataSrc = EXT_MOCK_SERVER;
+var dataSrc = EXT_HACKATHON_SERVER;
+
+// == Config this Vehicle Singal Server IP and Port Number here ==
 var WSSvrIP = '10.5.162.79';
 var HttpSvrPort = 8070;
 var WSSvrPort = 8071;
@@ -29,47 +44,217 @@ var wssvr = new WebSocketServer({
   port : WSSvrPort
 });
 
-// ===============================================
-// == Connect to external dataSrc via WebSocket ==
-// ===============================================
-// * Connect as client
-var DataSrcIP = '10.5.162.79';
-var DataSrcPort = 8072;
-var dataSrcUrl = "ws://" + DataSrcIP + ":" + DataSrcPort;
-var WebSocketClient = require('websocket').client;
-var g_dataSrc = new WebSocketClient();
+// =========================================
+// == dataSrc connection: local mock data ==
+// =========================================
+// TODO: this is very adhoc. better to brush up.
+// need dynamic configuration with vss meta data?
+var g_localMockDataSrc = {
 
-g_dataSrc.on('connect', function(conn) {
-  console.log('Connected to DataSrc');
-  conn.on('error', function(err) {
-    console.log("dataSrc on error ");
-  });
-  conn.on('close', function() {
-    console.log("dataSrc on close ");
-  });
-  conn.on('message', function(msg) {
-    //console.log("dataSrc on message :");
-    if (msg.type === 'utf8') {
-      dataReceiveHandler(msg.utf8Data);
+  speed: 60,
+  rpm: 1500,
+  steer: -60,
+  //thiz: this,
+
+  generateMockData: function() {
+    var thiz = this;
+    setInterval(function() {
+      var msg = thiz.getMockDataJson();
+      dataReceiveHandler(msg);
+    }, 1000);
+  },
+
+  getMockDataJson: function() {
+    var speed = this.getMockValueByPath("Signal.Drivetrain.Transmission.Speed");
+    var rpm   = this.getMockValueByPath("Signal.Drivetrain.InternalCombustionEngine.RPM");
+    var steer = this.getMockValueByPath("Signal.Chassis.SteeringWheel.Angle");
+    var timestamp = new Date().getTime().toString(10);
+
+    var obj = [
+      { "path": "Signal.Drivetrain.Transmission.Speed",
+        "value": speed,
+        "timestamp":timestamp},
+      { "path": "Signal.Drivetrain.InternalCombustionEngine.RPM",
+        "value": rpm,
+        "timestamp":timestamp},
+      { "path": "Signal.Chassis.SteeringWheel.Angle",
+        "value": steer,
+        "timestamp":timestamp}
+    ];
+    var msg = JSON.stringify(obj);
+    return msg;
+  },
+
+  getMockValueByPath: function(path) {
+    // Vehicle Speed
+    if (path === "Signal.Drivetrain.Transmission.Speed") {
+      this.speed += 5;
+      if (this.speed > 120) this.speed = 60;
+      return this.speed
+    // Engine RPM
+    } else if (path === "Signal.Drivetrain.InternalCombustionEngine.RPM") {
+      this.rpm += 10;
+      if (this.rpm > 2000) this.rpm = 1500;
+      return this.rpm;
+    // SteeringWheel Angle
+    } else if (path === "Signal.Chassis.SteeringWheel.Angle") {
+      this.steer += 5;
+      if (this.steer > 60) this.steer = -60;
+      return this.steer;
+    // others
+    } else {
     }
-  });
-});
-g_dataSrc.connect(dataSrcUrl,'');
+    return 0;
+  }
+};
+
+// Run dummy data source
+if (dataSrc === LOCAL_MOCK_DATA) {
+  g_localMockDataSrc.generateMockData();
+}
+
+// ===================================================
+// == dataSrc connection: external mock data server ==
+// ===================================================
+// * Connect as client
+var g_extMockDataSrc = {
+  svrUrl: "ws://10.5.162.79:8072",
+
+  connectHandler:  function(conn) {
+    console.log('connectHandler: ');
+    console.log('  :Connected to DataSrc');
+    conn.on('error', function(err) {
+      console.log("  :dataSrc on error ");
+    });
+    conn.on('close', function() {
+      console.log("  :dataSrc on close ");
+    });
+    conn.on('message', function(msg) {
+      if (msg.type === 'utf8') {
+        dataReceiveHandler(msg.utf8Data);
+      }
+    });
+  },
+}
+
+if (dataSrc === EXT_MOCK_SERVER) {
+  var WebSocketClient= require('websocket').client;
+  var wsClient = new WebSocketClient();
+  wsClient.on('connect', g_extMockDataSrc.connectHandler);
+  console.log("g_extMockDataSrc.svrUrl= " + g_extMockDataSrc.svrUrl);
+  wsClient.connect(g_extMockDataSrc.svrUrl,'');
+}
+
+// ======================================================
+// == dataSrc connection: SIP project Hackathon Server ==
+// ======================================================
+// #use socket.io by requirement of Hackathon server
+var g_extSIPDataSrc = {
+  roomID: 'room01',
+  svrUrl: "ws://xx.xx.xx.xx:xxxx",
+
+  // Convert data from SIP's format(hackathon format) to VSS format
+  // TODO: re-write in better way
+  // (first version is ad-hoc lazy implementation)
+  convertFormatFromSIPToVSS: function(sipData) {
+    //console.log("convertFormatFromSIPToVSS: sipData = " + sipData);
+    //console.log("convertFormatFromSIPToVSS: ");
+    var vssData;
+    var sipObj = JSON.parse(sipData);
+    var vehicleSpeed = this.getValueFromSIPObj(sipObj,"Vehicle.RunningStatus.VehicleSpeed.speed");
+    var engineSpeed = this.getValueFromSIPObj(sipObj,"Vehicle.RunningStatus.EngineSpeed.speed");
+    var steeringWheel = this.getValueFromSIPObj(sipObj,"Vehicle.RunningStatus.SteeringWheel.angle");
+
+    // Create VSS format JSON
+    // TODO: need brush up.
+    var vssObj = new Array();
+    if (vehicleSpeed != undefined) {
+      console.log("  :vehicleSpeed.value=" + vehicleSpeed.value);
+      console.log("  :vehicleSpeed.timestamp=" + vehicleSpeed.timestamp);
+      var obj =
+      { "path": "Signal.Drivetrain.Transmission.Speed",
+        "value": vehicleSpeed.value,
+        "timestamp":vehicleSpeed.timestamp};
+      vssObj.push(obj);
+    }
+    if (engineSpeed != undefined) {
+      //console.log("  :engineSpeed.value=" + engineSpeed.value);
+      //console.log("  :engineSpeed.timestamp=" + engineSpeed.timestamp);
+      var obj =
+      { "path": "Signal.Drivetrain.InternalCombustionEngine.RPM",
+        "value": engineSpeed.value,
+        "timestamp":engineSpeed.timestamp};
+      vssObj.push(obj);
+    }
+    if (steeringWheel != undefined) {
+      //console.log("  :steeringWheel.value=" + steeringWheel.value);
+      //console.log("  :steeringWheel.timestamp=" + steeringWheel.timestamp);
+      var obj =
+      { "path": "Signal.Chassis.SteeringWheel.Angle",
+        "value": steeringWheel.value,
+        "timestamp":steeringWheel.timestamp};
+      vssObj.push(obj);
+    }
+    if (vssObj.length > 1) {
+      var vssStr = JSON.stringify(vssObj);
+      return vssStr;
+    } else {
+      return undefined;
+    }
+  },
+
+  // SIP形式のJSONからpath指定で欲しい値を取り出す
+  // return value format: {value, timestamp}
+  getValueFromSIPObj: function(origObj, path) {
+    var pathElem = path.split(".");
+    var len = pathElem.length;
+    var obj = origObj;
+    var retObj = undefined;
+    for (var i=0; i<len; i++) {
+      if(obj[pathElem[i]]==undefined) {
+        return undefined;
+      } else if (i<(len-1) && obj[pathElem[i]]!=undefined) {
+        obj = obj[pathElem[i]];
+      } else if (i==(len-1) && obj[pathElem[i]]!=undefined) {
+        retObj = {};
+        retObj.value = obj[pathElem[i]];
+        retObj.timestamp = obj['timeStamp']; //SIP's timestamp is 'timeStamp'.
+      }
+    }
+    return retObj;
+  }
+}
+
+if (dataSrc === EXT_HACKATHON_SERVER) {
+  var sockioClient = require('socket.io-client');
+  var sioClient = sockioClient.connect(g_extSIPDataSrc.svrUrl);
+
+  if (sioClient != undefined) {
+    sioClient.on("vehicle data", function(sipData) {
+      //console.log("on.vehicle_data:");
+      var vssData = g_extSIPDataSrc.convertFormatFromSIPToVSS(sipData);
+      if (vssData != undefined) {
+        //console.log("  :vssData= "+ vssData);
+        dataReceiveHandler(vssData);
+      }
+    });
+    sioClient.on('connect',function(){
+        console.log("on.connect");
+        var msg = {"roomID":g_extSIPDataSrc.roomID, "data":"NOT REQUIRED"};
+        sioClient.emit('joinRoom', JSON.stringify(msg));
+    });
+  }
+}
 
 //TODO: One WebSocket connection should have one IdTable. Currently only one global IdTable.
 
 // =========================
 // == define RequestTable ==
 // =========================
-// memo:
-// 当面はsubscribeの情報のみ格納するが
-// 先々は、get, setなども格納が必要になりそう
-// DataBrokerからのデータを待つ仕組みにする想定のため
 var g_reqTable = {
   requestHash: {},
   subIdHash: {},
 
-  //TODO: 要テスト
   addReqToTable: function(reqObj, subId, timerId) {
     var reqId = reqObj.requestId;
     console.log("addReqToTable: reqId="+reqId);
@@ -239,59 +424,50 @@ wssvr.on('connection', function(ws) {
   });
 });
 
-// ============================
-// == Data Source Connection ==
-// ============================
-//TODO:
-// - dataはWSで別ホストから送付される前提。
-// - on.message でJSONを受け取り中身を解析すると取得データが分かる
-// - on.message でリクエストキュー内のリクエストの要求パスとマッチングする
-// - まずは、data sourceのモックをタイマ駆動で作り
-// - on.message 代わりのハンドラで受ける仕組みを作る
+function dataReceiveHandler(message) {
+  //console.log("dataReceiveHandler: ");
+  //console.log("  :message=" + message);
+  var obj = JSON.parse(message);
+  var dataObj;
+  var retObj, reqObj;
 
-// dataSrcからのWebSocketメッセージ受信は以下で処理する想定
+  for (var i in g_reqTable.requestHash) {
+    reqObj = g_reqTable.requestHash[i];
+    dataObj = null;
+    retObj = null;
+    console.log("  :reqObj="+JSON.stringify(reqObj));
 
-// WebSocketで外部のdataSrcからデータを受信する代わりに
-// タイマーでダミーdataSrcからの受信イベントを発生させる
-function dummySrc_ReceiveData() {
-  setInterval(function() {
-    // receive data Json
-    var msg = receiveDataSrcJson();
-    dataReceiveHandler(msg);
-  }, 1000);
-}
+    // do matching between received data path and client's request.
+    // TODO: find faster efficient mathcing method.
+    //       for now, treat path just as simple string.
+    //       there should be better way to handle VSS tree structure.
+    //       use hash or index or something.
+    if ((dataObj = matchPath(reqObj.path, obj)) != null) {
+      if (reqObj.action === "get") {
+        // send back 'getSuccessResponse'
+        retObj = createGetSuccessResponseJson(reqObj.requestId, dataObj.value, dataObj.timestamp);
+        if (g_ws != null)
+          g_ws.send(JSON.stringify(retObj));
+        // delete this request from queue
+        g_reqTable.delReqByReqId(reqObj.requestId);
 
-function receiveDataSrcJson() {
-  var speed = getValueByPath("Signal.Drivetrain.Transmission.Speed");
-  var rpm   = getValueByPath("Signal.Drivetrain.InternalCombustionEngine.RPM");
-  var steer = getValueByPath("Signal.Chassis.SteeringWheel.Angle");
-  var timestamp = new Date().getTime().toString(10);
-
-  //TODO: ここで返すデータの形式はどういうのが良い？
-  //ハッカソンサーバからはZMP形式のJSONが来るが..
-  //- 一番簡単なのは、以下のように単純に文字列として扱うこと。
-  //  とりあえず、これでいく
-  //- 他の方法は？。。ツリー構造を意識した方法？
-  //- 後のマッチングがやりやすい方法がよいが..
-  var obj = [
-    { "path": "Signal.Drivetrain.Transmission.Speed",
-      "value": speed,
-      "timestamp":timestamp},
-    { "path": "Signal.Drivetrain.InternalCombustionEngine.RPM",
-      "value": rpm,
-      "timestamp":timestamp},
-    { "path": "Signal.Chassis.SteeringWheel.Angle",
-      "value": steer,
-      "timestamp":timestamp}
-  ];
-  var msg = JSON.stringify(obj);
-  return msg;
+      } else if (reqObj.action === "subscribe") {
+        // send back 'subscribeSuccessResponse'
+        retObj = createSubscribeNotificationJson(reqObj.requestId, reqObj.subscriptionId,
+                    reqObj.action, reqObj.path, dataObj.value, dataObj.timestamp);
+        if (g_ws != null)
+          g_ws.send(JSON.stringify(retObj));
+      } else {
+        // nothing to do
+      }
+    }
+  }
 }
 
 function matchPath(path, dataObj) {
   //console.log("matchPath: path=" + path);
-  //TODO: 効率の良いマッチング方法を考える
-  //    :とりあえずは一番簡単な方法でやる
+  //TODO: find more efficient matching method
+  //    : as 1st version, take simplest way
   for (var i in dataObj) {
     if (dataObj[i].path === path) {
       //console.log("  :data found. path="+path);
@@ -299,79 +475,6 @@ function matchPath(path, dataObj) {
     }
   }
 }
-
-function dataReceiveHandler(message) {
-  console.log("dataReceiveHandler: ");
-  //ここのmessageは、ZMPのJSONフォーマットで来る想定
-  var obj = JSON.parse(message);
-  var dataObj;
-  var retObj, reqObj;
-  // 複数のデータの変更が通知される
-
-  // get, subscribe等のリクエストキューのエントリの
-  // 各データpathとマッチング。マッチしたらイベント発火となる
-  //TODO: 遅くならないマッチング方法は？
-  //      g_reqTableの構造を変える？
-  //      pathを与えると、該当するrequestがパッと取れるような。。
-  for (var i in g_reqTable.requestHash) {
-    reqObj = g_reqTable.requestHash[i];
-    dataObj = null;
-    retObj = null;
-    console.log("  :reqObj="+JSON.stringify(reqObj));
-    if ((dataObj = matchPath(reqObj.path, obj)) != null) {
-      if (reqObj.action === "get") {
-        // getSuccessResponse を送り返す
-        retObj = createGetSuccessResponseJson(reqObj.requestId, dataObj.value, dataObj.timestamp);
-        if (g_ws != null)
-          g_ws.send(JSON.stringify(retObj));
-        // Queからこのrequestを削除する
-        g_reqTable.delReqByReqId(reqObj.requestId);
-
-      } else if (reqObj.action === "subscribe") {
-        // subscribeSuccessResponseを送り返す
-        retObj = createSubscribeNotificationJson(reqObj.requestId, reqObj.subscriptionId,
-                    reqObj.action, reqObj.path, dataObj.value, dataObj.timestamp);
-        //console.log("  :subscribe: retObj="+JSON.stringify(retObj));
-        if (g_ws != null)
-          g_ws.send(JSON.stringify(retObj));
-      } else {
-        // ここには来ないはず
-      }
-    }
-  }
-}
-
-var speed = 60;
-var rpm = 1500;
-var steer = -60;
-function getValueByPath(path) {
-  // * この部分をよりintelligentな仕組みにしていくことが必要
-  // * VSSのメタデータを受け取って新しいVSSツリーに対応する機能も仕様にある
-
-  // Vehicle Speed
-  if (path === "Signal.Drivetrain.Transmission.Speed") {
-    speed += 5;
-    if (speed > 120) speed = 60;
-    return speed
-  // Engine RPM
-  } else if (path === "Signal.Drivetrain.InternalCombustionEngine.RPM") {
-    rpm += 10;
-    if (rpm > 2000) rpm = 1500;
-    return rpm;
-  // SteeringWheel Angle
-  } else if (path === "Signal.Chassis.SteeringWheel.Angle") {
-    steer += 5;
-    if (steer > 60) steer = -60;
-    return steer;
-  // others
-  } else {
-    ret = 0;
-  }
-  return ret;
-}
-
-// Run dummy data source
-//dummySrc_ReceiveData();
 
 // ===================
 // == Utility funcs ==
@@ -391,7 +494,7 @@ function getUniqueSubId() {
   return "subid-"+uniq;
 }
 
-//====================
+// ===================
 // == JSON Creation ==
 // ===================
 function createGetSuccessResponseJson(reqId, value, timestamp) {
@@ -426,4 +529,5 @@ function createUnsubscribeErrorResponseJson(action, reqId, subId, error, timesta
                 "error":error, "timestamp":timestamp};
   return retObj;
 }
+
 
