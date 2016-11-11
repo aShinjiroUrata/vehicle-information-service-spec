@@ -1,4 +1,4 @@
-// datasrc.js
+// mockDataSvr.js
 // * This is data source WebSocket Server
 // * to be used as replacemnt of actual vehicle.
 // * Function is just to send data to Vehicle Signal Server.
@@ -6,8 +6,8 @@
 "use strict"
 
 // == Set Server IP and Port Number here ==
-var DataSrcIP = '10.5.162.79';
-var DataSrcPort = 8072;
+var DataSrcIP = '127.0.0.1';
+var DataSrcPort = 3002;
 
 // ===========================
 // == Start WebSocketServer ==
@@ -37,8 +37,8 @@ dataSrcSvr.on('connection', function(ws) {
   });
 
   ws.on('close', function() {
+    // closing operation
     console.log('ws.on:close');
-    //終了処理
     clearInterval(timerId);
   });
 });
@@ -47,19 +47,12 @@ var speed = 60;
 var rpm = 1500;
 var steer = -60;
 
-// この辺の作りは適当。あとで作り直す。
+// TODO: ad hoc code. rewrite later
 function generateDataJson() {
   var speed = getValueByPath("Signal.Drivetrain.Transmission.Speed");
   var rpm   = getValueByPath("Signal.Drivetrain.InternalCombustionEngine.RPM");
   var steer = getValueByPath("Signal.Chassis.SteeringWheel.Angle");
   var timestamp = new Date().getTime().toString(10);
-
-  //TODO: ここで返すデータの形式はどういうのが良い？
-  //ハッカソンサーバからはZMP形式のJSONが来るが..
-  //- 一番簡単なのは、以下のように単純に文字列として扱うこと。
-  //  とりあえず、これでいく
-  //- 他の方法は？。。ツリー構造を意識した方法？
-  //- 後のマッチングがやりやすい方法がよいが..
 
   var obj = [
     { "path": "Signal.Drivetrain.Transmission.Speed",
@@ -75,9 +68,8 @@ function generateDataJson() {
   return obj;
 }
 
+// TODO: ad hoc code. rewrite later
 function getValueByPath(path) {
-  // * この部分をよりintelligentな仕組みにしていくことが必要
-  // * VSSのメタデータを受け取って新しいVSSツリーに対応する機能も仕様にある
 
   // Vehicle Speed
   if (path === "Signal.Drivetrain.Transmission.Speed") {

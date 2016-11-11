@@ -1,29 +1,42 @@
+//
+// Vehicle Signal Server prototype implementation
+//
 // to use:
-// * npm install ws
-// * node wssvr.js
-// * open with browser: http://10.5.162.79:8070
-// * to use ext mock server, run the mock server by
-// * * node datasrc.js
-// * to use ext SIP hackathon server,
-// * * run hackathon server
-// * * submit roomID='room01'
-// * * select drive data and start to play the data
+// 1.Install packages
+//   $npm install ws socket.io
+// 2.Edit VSSvr.js code
+// - edit VSSvr's IP address by change VSSvrIP value.(change port if you like)
+// - select data source to connect
+//   - LOCAL_MOCK_DATA : to use hard coded data source driven by timer
+//   - EXT_MOCK_SERVER : to use external websocket mock server 'mockDataSvr.js'
+//   - EXT_SIP_SERVER  : to use websocket server which hosts actual vehicle data
+//                       developed for SIP hackathon.
+// 3.Start Vehicle Signal Server
+//   $node VSSvr.js
+// 4 Open client app by browser via url= http://{VSSvrIP}:{HttpSvrPort}
+// 5.If EXT_MOCK_SERVER data source is selected, start external mock data source
+//   (*Edit IP, port in mockDataSvr.js to match with VSSvr.js)
+//   $node mockDataSrc.js
+// 6.If EXT_SIP_SERVER data source is selected, start SIP hackathon server
+// - Open SIP hackathon server app by google chrome (*URL is not public)
+// - enter roomID='room01' and submit
+// - select drive data and start to play the data
 
 "use strict"
 
 // == data source selection ==
 var LOCAL_MOCK_DATA = 0;
 var EXT_MOCK_SERVER = 1;
-var EXT_HACKATHON_SERVER = 2;
+var EXT_SIP_SERVER = 2;
 // Please select dataSrc from above options
 //var dataSrc = LOCAL_MOCK_DATA;
-//var dataSrc = EXT_MOCK_SERVER;
-var dataSrc = EXT_HACKATHON_SERVER;
+var dataSrc = EXT_MOCK_SERVER;
+//var dataSrc = EXT_SIP_SERVER;
 
 // == Config this Vehicle Singal Server IP and Port Number here ==
-var WSSvrIP = '10.5.162.79';
-var HttpSvrPort = 8070;
-var WSSvrPort = 8071;
+var VSSvrIP = '127.0.0.1';
+var HttpSvrPort = 3000;
+var VSSvrPort = 3001;
 
 // =========================
 // == Publish client.html ==
@@ -40,8 +53,8 @@ var httpsvr = require('http').createServer(function(req, res) {
 // ===========================
 var WebSocketServer = require('ws').Server;
 var wssvr = new WebSocketServer({
-  host : WSSvrIP,
-  port : WSSvrPort
+  host : VSSvrIP,
+  port : VSSvrPort
 });
 
 // =========================================
@@ -118,7 +131,7 @@ if (dataSrc === LOCAL_MOCK_DATA) {
 // ===================================================
 // * Connect as client
 var g_extMockDataSrc = {
-  svrUrl: "ws://10.5.162.79:8072",
+  svrUrl: "ws://127.0.0.1:3002",
 
   connectHandler:  function(conn) {
     console.log('connectHandler: ');
@@ -225,7 +238,7 @@ var g_extSIPDataSrc = {
   }
 }
 
-if (dataSrc === EXT_HACKATHON_SERVER) {
+if (dataSrc === EXT_SIP_SERVER) {
   var sockioClient = require('socket.io-client');
   var sioClient = sockioClient.connect(g_extSIPDataSrc.svrUrl);
 

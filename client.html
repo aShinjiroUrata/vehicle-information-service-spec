@@ -34,11 +34,9 @@
   <button onclick="clearMsgArea();">clearMsgArea</button>
   <div id="msg"></div>
   <script type="text/javascript">
-  //TODO
-  // sessionのインスタンスごとにIdテーブル等を管理したい
 
-  var WSSvrIP = "10.5.162.79";
-  var WSSvrPort = "8071";
+  var WSSvrIP = "127.0.0.1";
+  var WSSvrPort = "3001";
 
   var g_vehicle = null; // only one WebSocket connection is allowed
   var g_reqTable = null;
@@ -95,7 +93,6 @@
 
       // requestはsubIdを持たない場合もある
       // TODO: unsubscribeのエントリはsubIdHashには登録しない
-      //   unsubの場合、subId == undefinedになるから現状の仕組みで問題ない
       if (subId != undefined)
         delete this.subIdHash[subId];
       showInMsgArea("--:entry deleted. reqId="+reqId+" ,subId="+subId);
@@ -110,9 +107,6 @@
 
     getReqBySubId: function(subId) {
       //showInMsgArea("getReqBySubId: subId="+subId);
-      // subscribeとunsubは同じsubIdを使用する
-      // 一つのsubIdでsubIdHashに2件登録されるのは不都合。
-      // unsubのエントリはsubIdHashに登録する必要はなさそうなのでそうしてみる
       var reqId = this.subIdHash[subId];
       if (reqId == undefined) return false;
       return this.getReqByReqId(reqId);
@@ -216,46 +210,41 @@
       //       subscribeのrequestHashエントリの削除はunsubscribeによる
 
       if (isSubscribeSuccessResponse(msg)) {
-        // subscribeSuccessResponseの場合
-        // subIdをrequestTableに追加する
+        // case of 'subscribeSuccessResponse'
+        // add subId to requestTable
         //showInMsgArea("--:msgtype: SubscribeSuccessResponse");
         g_reqTable.setSubIdToReq(msg.requestId, msg.subscriptionId);
 
       } else if (isSubscribeErrorResponse(msg)) {
-        // subscribeErrorRespの場合
-        // subscribe失敗したので、requestTalbeからエントリ削除
+        // case of 'subscribeErrorResponse'
+        // delete entry from requestTable
         //showInMsgArea("--:msgtype: SubscribeErrorResponse");
         g_reqTable.delReqByReqId(msg.requestId);
 
       } else if (isSubscriptionNotification(msg)) {
-        // subscribeNotificationの場合
-        // subIdしか持っていない
-        // valueの通知を受けてハンドラに引き渡す
+        // case of subscribeNotification
         //showInMsgArea("--:msgtype: SubscriptionNotification");
-        // notification で valueが通知されたので表示する
         showMsgByActionAndPath(msg.value, reqObj.action, reqObj.path);
 
       } else if (isSubscriptionNotificationError(msg)) {
         //showInMsgArea("--:msgtype: SubscriptionNotificationError");
         // noting to do special here. continu subscribe.
       } else {
-        // ここには来ないはず
+        //noone come here
         //showInMsgArea("--:msgtype: Subscribe: Unknown");
       }
 
     // case of 'unsubscribe'
     } else if (action === "unsubscribe") {
-      //memo: unsubの場合は msgにはreqId, subId両方存在する
-      // ただし、subIdは、subscribeとunsubscribeで同じものを使用する
-      // つまり、g_reqTableのなかでsubIdはuniqueではない
 
       if (msg.error != undefined) {
-        // unsub失敗。unsubのリクエスト削除は行う
-        // subscribeのリクエストは削除しない
+        // unsubscribe failed
+        // - delete unsubscribe request from requestTable
         g_reqTable.delReqByReqId(reqId);
       } else {
-        // unsub成功。unsubのリクエスト削除は行う
-        // subscribeのリクエスト削除も行う
+        // unsubscribe success
+        // - delete subscribe request from requestTable
+        // - delete unsubscribe request from requestTable
         var reqId = msg.requestId;
         var targ_subId = msg.subscriptionId; //unsub対象のsubscribeのsubId
         var targ_reqId = g_reqTable.getReqIdBySubId(targ_subId); //subscribeのreqId
@@ -263,7 +252,7 @@
         g_reqTable.delReqByReqId(targ_reqId); //subscribeのエントリを削除
         g_reqTable.delReqByReqId(reqId);      //unsubのエントリを削除
 
-        //ボタンlock用のフラグもクリア
+        // clear flag for button lock
         g_ui.clearSubscribeBtnLock(targ_reqId);
       }
 
