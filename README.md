@@ -11,7 +11,7 @@ Tested with:
 To use:
 
 1.Install packages
-  $npm install fs http ws websocket socket.io socket.io-client
+- $npm install fs http ws websocket socket.io socket.io-client
 
 2.Edit VSSvr.js code
 - edit VSSvr's IP address by change VSSvrIP value.(change port if you like)
@@ -22,18 +22,16 @@ To use:
                       developed for SIP hackathon.
 
 3.Start Vehicle Signal Server
-  $node VSSvr.js
+- $node VSSvr.js
 
 4.Open client app by browser via url= http://{VSSvrIP}:{HttpSvrPort}
 
 5.If EXT_MOCK_SERVER data source is selected, start external mock data source
-  (#Edit IP, port in mockDataSvr.js to match with VSSvr.js)
-  $node mockDataSrc.js
+- edit IP, port in mockDataSvr.js to match with VSSvr.js
+- $node mockDataSrc.js
 
 6.If EXT_SIP_SERVER data source is selected, start SIP hackathon server
 - Open SIP hackathon server app by google chrome (#URL is not public)
 - enter roomID='room01' and submit
 - select drive data and start to play the data
-
-
 
