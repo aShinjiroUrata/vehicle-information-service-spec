@@ -67,7 +67,6 @@ var g_localMockDataSrc = {
   speed: 60,
   rpm: 1500,
   steer: -60,
-  //thiz: this,
 
   generateMockData: function() {
     var thiz = this;
@@ -83,7 +82,7 @@ var g_localMockDataSrc = {
     var steer = this.getMockValueByPath("Signal.Chassis.SteeringWheel.Angle");
     var timestamp = new Date().getTime().toString(10);
 
-    var obj = [
+    var dataObj = [
       { "path": "Signal.Drivetrain.Transmission.Speed",
         "value": speed,
         "timestamp":timestamp},
@@ -94,6 +93,7 @@ var g_localMockDataSrc = {
         "value": steer,
         "timestamp":timestamp}
     ];
+    var obj = {"data": dataObj};
     var msg = JSON.stringify(obj);
     return msg;
   },
@@ -130,25 +130,45 @@ if (dataSrc === LOCAL_MOCK_DATA) {
 // == dataSrc connection: external mock data server ==
 // ===================================================
 // * Connect as client
-var g_extMockDataSrc = {
-  svrUrl: "ws://127.0.0.1:3002",
 
-  connectHandler:  function(conn) {
-    console.log('connectHandler: ');
-    console.log('  :Connected to DataSrc');
-    conn.on('error', function(err) {
-      console.log("  :dataSrc on error ");
-    });
-    conn.on('close', function() {
-      console.log("  :dataSrc on close ");
-    });
-    conn.on('message', function(msg) {
-      if (msg.type === 'utf8') {
-        dataReceiveHandler(msg.utf8Data);
+var g_extMockDataSrc = (function() {
+
+  var m_svrUrl = "ws://127.0.0.1:3002";
+  var m_conn = null;
+
+  var obj = {
+    svrUrl: m_svrUrl,
+
+    connectHandler:  function(conn) {
+      m_conn = conn;
+      console.log('connectHandler: ');
+      console.log('  :Connected to DataSrc');
+
+      conn.on('error', function(err) {
+        console.log("  :dataSrc on error ");
+      });
+      conn.on('close', function() {
+        console.log("  :dataSrc on close ");
+        m_conn = null;
+      });
+      conn.on('message', function(msg) {
+        if (msg.type === 'utf8') {
+          dataReceiveHandler(msg.utf8Data);
+        }
+      });
+    },
+
+    //send set request to mockDataSrc
+    sendSetRequest: function(obj) {
+      if (m_conn != null) {
+        console.log("sendSetRequest: ");
+        console.log("  :obj="+JSON.stringify(obj));
+        m_conn.sendUTF(JSON.stringify(obj));
       }
-    });
-  },
-}
+    }
+  }
+  return obj;
+})();
 
 if (dataSrc === EXT_MOCK_SERVER) {
   var WebSocketClient= require('websocket').client;
@@ -164,7 +184,8 @@ if (dataSrc === EXT_MOCK_SERVER) {
 // #use socket.io by requirement of Hackathon server
 var g_extSIPDataSrc = {
   roomID: 'room01',
-  svrUrl: "ws://xx.xx.xx.xx:xxxx",
+  //svrUrl: "ws://xx.xx.xx.xx:xxxx",
+  svrUrl: "ws://52.193.60.25:3000"
 
   // Convert data from SIP's format(hackathon format) to VSS format
   // TODO: re-write in better way
@@ -209,7 +230,9 @@ var g_extSIPDataSrc = {
       vssObj.push(obj);
     }
     if (vssObj.length > 1) {
-      var vssStr = JSON.stringify(vssObj);
+      var obj = {"data": vssObj};
+      //var vssStr = JSON.stringify(vssObj);
+      var vssStr = JSON.stringify(obj);
       return vssStr;
     } else {
       return undefined;
@@ -364,14 +387,14 @@ var g_reqTable = {
 var g_ws = null;
 
 wssvr.on('connection', function(ws) {
-  console.log('ws.on:connection');
+  //console.log('ws.on:connection');
   g_ws = ws;
 
   // for connecting to outside data source
   g_ws.on('message', function(message) {
     var obj = JSON.parse(message);
-    console.log("ws.on:message: obj= " + message);
-    console.log("  :action=" + obj.action);
+    //console.log("ws.on:message: obj= " + message);
+    //console.log("  :action=" + obj.action);
 
     // for 'get'
     if (obj.action === "get") {
@@ -382,6 +405,25 @@ wssvr.on('connection', function(ws) {
         console.log("  :Failed to add 'get' info to requestTable.");
       }
       console.log("  :get request registered. reqId=" + reqId + ", path=" + path);
+
+    } else if (obj.action === "set") {
+      //console.log("  :action=" + obj.action);
+      var reqId = obj.requestId;
+      var path = obj.path;
+      var value = obj.value;
+      var ret = g_reqTable.addReqToTable(obj, null, null);
+
+      // TODO:
+      // 次に dataSrcにset要求を送る。
+      // dataSrc==extMockDataSrcの場合は送るが、それ以外は送らない？
+      // とりあえずはextMockDataSrcの場合だけ考える
+      g_extMockDataSrc.sendSetRequest(obj);
+
+    } else if (obj.action === "authorize") {
+      //TODO
+
+    } else if (obj.action === "getVSS") {
+      //TODO
 
     // for 'subscribe'
     } else if (obj.action === "subscribe") {
@@ -419,12 +461,6 @@ wssvr.on('connection', function(ws) {
       }
       g_ws.send(JSON.stringify(resObj));
 
-    } else if (obj.action === "set") {
-      //TODO
-    } else if (obj.action === "authorize") {
-      //TODO
-    } else if (obj.action === "getVSS") {
-      //TODO
     } else {
       //Do nothing
     }
@@ -437,55 +473,107 @@ wssvr.on('connection', function(ws) {
   });
 });
 
+// dataSrcから受信したデータを処理する
 function dataReceiveHandler(message) {
   //console.log("dataReceiveHandler: ");
   //console.log("  :message=" + message);
   var obj = JSON.parse(message);
-  var dataObj;
+  var dataObj = obj.data;
+  var setObj = obj.set;
+
+  var matchObj;
   var retObj, reqObj;
 
-  for (var i in g_reqTable.requestHash) {
-    reqObj = g_reqTable.requestHash[i];
-    dataObj = null;
-    retObj = null;
-    console.log("  :reqObj="+JSON.stringify(reqObj));
+  if (setObj != undefined) {
+    // handler for 'set' response
+    console.log("  :set message=" + JSON.stringify(setObj));
 
-    // do matching between received data path and client's request.
-    // TODO: find faster efficient mathcing method.
-    //       for now, treat path just as simple string.
-    //       there should be better way to handle VSS tree structure.
-    //       use hash or index or something.
-    if ((dataObj = matchPath(reqObj.path, obj)) != null) {
-      if (reqObj.action === "get") {
-        // send back 'getSuccessResponse'
-        retObj = createGetSuccessResponseJson(reqObj.requestId, dataObj.value, dataObj.timestamp);
+    for (var i in g_reqTable.requestHash) {
+      reqObj = g_reqTable.requestHash[i];
+      if (reqObj.action != 'set') {
+        console.log("  :skip data: action="+ reqObj.action);
+        continue;
+      }
+      matchObj = null;
+      retObj = null;
+      //console.log("  :reqObj="+JSON.stringify(reqObj));
+
+      if ((matchObj = matchPathforSet(reqObj, setObj)) != undefined) {
+        if (setObj.error != undefined) {
+          retObj = createSetErrorResponseJson(reqObj.requestId, setObj.error, setObj.timestamp);
+        } else {
+          retObj = createSetSuccessResponseJson(reqObj.requestId, setObj.timestamp);
+        }
         if (g_ws != null)
           g_ws.send(JSON.stringify(retObj));
         // delete this request from queue
         g_reqTable.delReqByReqId(reqObj.requestId);
+      }
+    }
+  } else if (dataObj != undefined) {
+    // handler for 'data' notification from data source
+    // handle 'get' and 'subscribe' at here
 
-      } else if (reqObj.action === "subscribe") {
-        // send back 'subscribeSuccessResponse'
-        retObj = createSubscribeNotificationJson(reqObj.requestId, reqObj.subscriptionId,
-                    reqObj.action, reqObj.path, dataObj.value, dataObj.timestamp);
-        if (g_ws != null)
-          g_ws.send(JSON.stringify(retObj));
-      } else {
-        // nothing to do
+    //console.log("  :data message=" + JSON.stringify(dataObj));
+    for (var i in g_reqTable.requestHash) {
+      reqObj = g_reqTable.requestHash[i];
+      if (reqObj.action != 'get' && reqObj.action != 'subscribe') {
+        console.log("  :skip data: action="+ reqObj.action);
+        continue;
+      }
+      matchObj = null;
+      retObj = null;
+      //console.log("  :reqObj="+JSON.stringify(reqObj));
+
+      // do matching between received data path and client's request.
+      // TODO: find faster efficient mathcing method.
+      //       for now, treat path just as simple string.
+      //       there should be better way to handle VSS tree structure.
+      //       use hash or index or something.
+      if ((matchObj = matchPath(reqObj, dataObj)) != undefined) {
+        if (reqObj.action === "get") {
+          // send back 'getSuccessResponse'
+          retObj = createGetSuccessResponseJson(reqObj.requestId, matchObj.value, matchObj.timestamp);
+          if (g_ws != null)
+            g_ws.send(JSON.stringify(retObj));
+          // delete this request from queue
+          g_reqTable.delReqByReqId(reqObj.requestId);
+
+        } else if (reqObj.action === "subscribe") {
+          // send back 'subscribeSuccessResponse'
+          retObj = createSubscribeNotificationJson(reqObj.requestId, reqObj.subscriptionId,
+                      reqObj.action, reqObj.path, matchObj.value, matchObj.timestamp);
+          if (g_ws != null)
+            g_ws.send(JSON.stringify(retObj));
+        /*
+        } else if (reqObj.action === "set") {
+        } else if (reqObj.action === "authorize") {
+        } else if (reqObj.action === "getVSS") {
+        */
+        } else {
+          // nothing to do
+        }
       }
     }
   }
 }
 
-function matchPath(path, dataObj) {
-  //console.log("matchPath: path=" + path);
+function matchPath(reqObj, dataObj) {
   //TODO: find more efficient matching method
   //    : as 1st version, take simplest way
   for (var i in dataObj) {
-    if (dataObj[i].path === path) {
-      //console.log("  :data found. path="+path);
+    if (dataObj[i].path === reqObj.path) {
       return dataObj[i];
     }
+  }
+  return undefined;
+}
+
+function matchPathforSet(reqObj, dataObj) {
+  if (reqObj.path === dataObj.path) {
+    return dataObj;
+  } else {
+    return undefined;
   }
 }
 
@@ -543,4 +631,14 @@ function createUnsubscribeErrorResponseJson(action, reqId, subId, error, timesta
   return retObj;
 }
 
+function createSetSuccessResponseJson(reqId, timestamp) {
+  console.log("createSetSuccessResponseJson");
+  var retObj = {"action": "set", "requestId":reqId, "timestamp":timestamp};
+  return retObj;
+}
+function createSetErrorResponseJson(reqId, error, timestamp) {
+  console.log("createSetErrorResponseJson");
+  var retObj = {"action": "set", "requestId":reqId, "error":error, "timestamp":timestamp};
+  return retObj;
+}
 

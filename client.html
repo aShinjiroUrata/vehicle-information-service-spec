@@ -17,6 +17,13 @@
   <br><button onclick="wsConnect();">ws connect</button><button onclick="wsDisconnect();">ws disconnect</button>
   <span class="val_area" id="msg_connect"></span>
   <br>
+
+  <br><button onclick="wsAuthorize();">authorize</button>
+  <span class="val_area" id="msg_authorize"></span>
+  <br><button onclick="wsGetVss();">get VSS</button>
+  <span class="val_area" id="msg_get_vss"></span>
+  <br>
+
   <br><button onclick="wsGetSpeed();">get speed</button>
   <span class="val_area" id="msg_get_speed" ></span>
   <br><button onclick="wsGetEngineRPM();">get engine RPM</button>
@@ -24,13 +31,27 @@
   <br><button onclick="wsGetSteeringAngle();">get steering angle</button>
   <span class="val_area" id="msg_get_steer"></span>
   <br>
+
+  <br><button onclick="wsSetDoorRow1RightLock();">set DoorLock(Row1-Right)</button>
+  <input type="text" class="val_area" id="txt_set_doorRow1RightLock" ></input>
+  <br><button onclick="wsGetDoorRow1RightLock();">get DoorLock(Row1-Right)</button>
+  <span class="val_area" id="msg_get_doorRow1RightLock" ></span>
+
+  <br><button onclick="wsSetHVACRow1RightTemp();">set HVACTemp(Row1-Right)</button>
+  <input type="text" class="val_area" id="txt_set_hvacRow1RightTemp"></input>
+  <br><button onclick="wsGetHVACRow1RightTemp();">get HVACTemp(Row1-Right)</button>
+  <span class="val_area" id="msg_get_hvacRow1RightTemp"></span>
+  <br>
+
   <br><button onclick="btnSubscribeSpeed();">subscribe speed</button><button onclick="btnUnsubscribeSpeed();">unsubscribe</button>
   <span class="val_area" id="msg_sub_speed"></span>
   <br><button onclick="btnSubscribeEngineRpm();">subscribe engine RPM</button><button onclick="btnUnsubscribeEngineRpm();">unsubscribe</button>
   <span class="val_area" id="msg_sub_rpm"></span>
   <br><button onclick="btnSubscribeSteerAngle();">subscribe steer angle</button><button onclick="btnUnsubscribeSteerAngle();">unsubscribe</button>
   <span class="val_area" id="msg_sub_steer"></span>
-  <br><br>
+  <br>
+
+  <br>
   <button onclick="clearMsgArea();">clearMsgArea</button>
   <div id="msg"></div>
   <script type="text/javascript">
@@ -191,7 +212,7 @@
       reqObj = g_reqTable.getReqBySubId(subId);
     }
     action = reqObj.action;
-    showInMsgArea("--:action="+action);
+    //showInMsgArea("--:action="+action);
 
     // case of 'get'
     if (action === "get") {
@@ -291,9 +312,15 @@
     showConnectMsg("WS Disconnected");
   }
 
+  // === authorize ===
+  // TODO:
+
+  // === getVSS ===
+  // TODO:
+
   // === get ===
   function wsGetItem(path) {
-    showInMsgArea("wsGetItem:");
+    //showInMsgArea("wsGetItem:");
     if (g_vehicle != null && g_vehicle.readyState === 1) {
       var reqId = getUniqueReqId();
       var req = {"action": "get", "path": path, "requestId":reqId};
@@ -311,6 +338,35 @@
   }
   function wsGetSteeringAngle() {
     wsGetItem("Signal.Chassis.SteeringWheel.Angle");
+  }
+
+  // === set ===
+  function wsSetItem(path,value) {
+    showInMsgArea("wsSetItem:");
+    if (g_vehicle != null && g_vehicle.readyState === 1) {
+      var reqId = getUniqueReqId();
+      var req = {"action": "set", "path": path, "value": value, "requestId":reqId};
+      g_reqTable.addReqByReqId(reqId, req);
+      var json_str = JSON.stringify(req);
+      g_vehicle.send(json_str);
+      showInMsgArea("--: ==> " + json_str);
+    }
+  }
+  function wsSetDoorRow1RightLock() {
+    var value = document.getElementById("txt_set_doorRow1RightLock").value;
+    //showInMsgArea("wsSetDoorRow1RightLock=" + value);
+    wsSetItem("Signal.Cabin.Door.Row1.Right.IsLocked", value);
+  }
+  function wsGetDoorRow1RightLock() {
+    wsGetItem("Signal.Cabin.Door.Row1.Right.IsLocked");
+  }
+
+  function wsSetHVACRow1RightTemp() {
+    var value = document.getElementById("txt_set_hvacRow1RightTemp").value;
+    wsSetItem("Signal.Cabin.HVAC.Row1.RightTemperature", value);
+  }
+  function wsGetHVACRow1RightTemp() {
+    wsGetItem("Signal.Cabin.HVAC.Row1.RightTemperature");
   }
 
   // === subscribe/unsubscribe ===
@@ -389,7 +445,6 @@
 
   // *** Authorize *** [TODO]
   // *** getVSS ***    [TODO]
-  // *** set ***       [TODO]
   // *** Ohters ***    [TODO]
 
   // == subscribe helper funcs ==
@@ -461,6 +516,9 @@
     targ.innerHTML = msgText;
   }
 
+  //TODO: need automatic way
+  // 一つ一つ書いてられないので仕組みを作ること
+  // ただし、このUIでどこまでやる必要があるか？
   function showMsgByActionAndPath(value, action, path) {
     var targ_id = null;
     if (path === "Signal.Drivetrain.Transmission.Speed" ) {
@@ -479,6 +537,23 @@
         targ_id = "msg_get_steer";
       else if (action === "subscribe")
         targ_id = "msg_sub_steer";
+
+    } else if (path === "Signal.Cabin.Door.Row1.Right.IsLocked" ) {
+      if (action === "get") {
+        targ_id = "msg_get_doorRow1RightLock";
+      } else if (action === "set") {
+        //do nothing
+      } else if (action === "subscribe") {
+        //do nothing
+      }
+
+    } else if (path === "Signal.Cabin.HVAC.Row1.RightTemperature" ) {
+      if (action === "get") {
+        targ_id = "msg_get_hvacRow1RightTemp";
+      } else if (action === "set") {
+      } else if (action === "subscribe") {
+      }
+
     }
     var targ = document.getElementById(targ_id);
     targ.innerHTML = value;
