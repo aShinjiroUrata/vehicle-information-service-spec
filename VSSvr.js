@@ -34,7 +34,8 @@ var dataSrc = EXT_MOCK_SERVER;
 //var dataSrc = EXT_SIP_SERVER;
 
 // == Config this Vehicle Singal Server IP and Port Number here ==
-var VSSvrIP = '127.0.0.1';
+//var VSSvrIP = '127.0.0.1';
+var VSSvrIP = '10.5.162.79';
 var HttpSvrPort = 3000;
 var VSSvrPort = 3001;
 
@@ -185,7 +186,7 @@ if (dataSrc === EXT_MOCK_SERVER) {
 var g_extSIPDataSrc = {
   roomID: 'room01',
   //svrUrl: "ws://xx.xx.xx.xx:xxxx",
-  svrUrl: "ws://52.193.60.25:3000"
+  svrUrl: "ws://52.193.60.25:3000",
 
   // Convert data from SIP's format(hackathon format) to VSS format
   // TODO: re-write in better way
@@ -420,10 +421,23 @@ wssvr.on('connection', function(ws) {
       g_extMockDataSrc.sendSetRequest(obj);
 
     } else if (obj.action === "authorize") {
-      //TODO
+      // TODO:
+      // パケットを分解
+      // Authorize Success Response を返送する
+      // VSSvr内にAuthorize状態を持っておく？
+      // Authorize状態はdataSrc側で持つべきものではない
 
     } else if (obj.action === "getVSS") {
-      //TODO
+      // TODO:
+      // 機械的にVSSを送り返せばよい？
+      // 形式はJSONで？
+      // VSSは本来は車両が持っている情報
+      // とすると、mockDataSrcに問い合わせて取得してもよい気がする
+      // が、単純化のために、VSSvr内で固定のJSONを返すことにする
+      // VSSを受けてクライアント側は何に使うのが正しい？
+      // 本来は、クライアントは車両からVSSを受け取り、利用可能なデータ項目を知るはず
+      // とすると、clientの実装はVSS受信して、それにあった状態になるべき
+      // が、それは先の課題としておく_
 
     // for 'subscribe'
     } else if (obj.action === "subscribe") {

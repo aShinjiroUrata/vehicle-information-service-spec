@@ -1,0 +1,157 @@
+{
+  "Signal": {
+    "description": "All signals that can dynamically be updated by the vehicle",
+    "type": "branch",
+    "children": {
+      "Drivetrain": {
+        "description": "Drivetrain data for internal combustion engines, transmissions, electric motors, etc.",
+        "type": "branch",
+        "children": {
+          "Transmission": {
+            "type": "branch",
+            "children": {
+              "PerformanceMode": {
+                "description": "Current gearbox performance mode.",
+                "type": "String",
+                "enum": [
+                  "normal",
+                  "sport",
+                  "economy",
+                  "snow",
+                  "rain"
+                ],
+                "id": 34
+              },
+              "Speed": {
+                "description": "Vehicle speed, as sensed by the gearbox.",
+                "min": 0,
+                "max": 400,
+                "type": "UInt16",
+                "id": 846,
+                "unit": "kph"
+              },
+              "Gear": {
+                "type": "UInt8",
+                "description": "Current gear. 0=Neutral. -1=Reverse",
+                "min": -1,
+                "max": 16,
+                "id": 33
+              },
+              "GearChangeMode": {
+                "description": "Is the gearbox in automatic or manual (paddle) mode.",
+                "type": "String",
+                "enum": [
+                  "manual",
+                  "automatic"
+                ],
+                "id": 35
+              },
+              "Temperature": {
+                "min": -50,
+                "max": 200,
+                "type": "Int16",
+                "id": 36,
+                "unit": "celsius",
+                "description": "The current gearbox temperature"
+              }
+            },
+            "description": "Transmission-specific data, stopping at the drive shafts."
+          },
+          "ElectricMotor": {
+            "description": "Electric Motor specific signals.",
+            "type": "branch",
+            "children": {}
+          },
+          "BatteryManagement": {
+            "description": "Battery Management signals",
+            "type": "branch",
+            "children": {}
+          },
+          "InternalCombustionEngine": {
+            "description": "Engine-specific data, stopping at the bell housing.",
+            "type": "branch",
+            "children": {
+              "EOP": {
+                "description": "Engine oil pressure.",
+                "min": 0,
+                "max": 10000,
+                "type": "Int16",
+                "id": 30,
+                "unit": "mbar"
+              },
+              "MAP": {
+                "description": "Manifold air pressure possibly boosted using forced induction.",
+                "min": 0,
+                "max": 10000,
+                "type": "Int16",
+                "id": 27,
+                "unit": "mbar"
+              },
+              "Power": {
+                "description": "Current engine power output.",
+                "min": 0,
+                "max": 2000,
+                "type": "Int16",
+                "id": 31,
+                "unit": "kW"
+              },
+              "EOT": {
+                "description": "Engine oil temperature.",
+                "min": -50,
+                "max": 300,
+                "type": "Int16",
+                "id": 26,
+                "unit": "celsius"
+              },
+              "Torque": {
+                "description": "Current engine torque.",
+                "min": 0,
+                "max": 3000,
+                "type": "Int16",
+                "id": 32,
+                "unit": "Nm"
+              },
+              "ECT": {
+                "description": "Engine coolant temperature.",
+                "min": -50,
+                "max": 200,
+                "type": "Int16",
+                "id": 25,
+                "unit": "celsius"
+              },
+              "TPS": {
+                "description": "Current throttle position.",
+                "min": 0,
+                "max": 100,
+                "type": "Int8",
+                "id": 29,
+                "unit": "percent"
+              },
+              "MAF": {
+                "description": "Grams of air drawn into engine per second.",
+                "min": 0,
+                "max": 3000,
+                "type": "Int16",
+                "id": 28,
+                "unit": "g/s"
+              },
+              "RPM": {
+                "description": "Engine speed measured as rotations per minute.",
+                "min": 0,
+                "max": 20000,
+                "type": "UInt16",
+                "id": 24,
+                "unit": "rpm"
+              }
+            }
+          },
+          "FuelCell": {
+            "type": "branch",
+            "children": {},
+            "description": "Fuel Cell signals"
+          }
+        }
+      }
+    }
+  }
+}
