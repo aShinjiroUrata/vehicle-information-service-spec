@@ -3,8 +3,31 @@
 <head>
   <meta charset="UTF-8">
   <title>VSSS client</title>
+
   <style>
-    #msg { height:600px; width:1500px; background-color:lightgrey; font-size:14px;}
+  body{
+    width:1920px;
+    margin:10px;
+  }
+  #header{
+    width:1920px;
+    margin:5px;
+  }
+  #wrapper{
+    float:left;
+  }
+  #main{
+    width:550px;
+    float:left;
+  }
+  #right{
+    width:1200px;
+    float:right;
+  }
+  </style>
+
+  <style>
+    #msg { height:600px; width:1200px; background-color:lightgrey; font-size:14px;}
     #msg_vss { height:100px; width:500px; background-color:lightgrey; font-size:14px;}
     .msg_vss_desc { height: 20px; width:500px; background-color:lightgrey; font-size:14px; display:inline-block;}
     .val_area { height: 20px; width:150px; background-color:lightgrey; font-size:14px; display:inline-block;}
@@ -14,69 +37,76 @@
 </head>
 
 <body>
-  <h3> Vehicle Signal Server Spec Trial Implementaion </h3>
-  <span id="server_info"></span>
-  <br>
-  <br><button onclick="wsConnect();">ws connect</button>
-  <button onclick="wsDisconnect();">ws disconnect</button>
-  <span class="val_area" id="msg_connect"></span>
-  <br>
+  <header id="header">
+    <h3> Vehicle Signal Server Spec Trial Implementaion </h3>
+    <span id="server_info"></span>
+    <br>
+  </header>
 
-  <br><button onclick="btnAuthorize();">authorize</button>
-  <span class="val_area" id="msg_authorize"></span>
-  <br><button onclick="btnGetVssFile();">get VSS</button>
-  <span class="val_area" id="msg_get_vss"></span>
-  <br>
+  <div id="wrapper">
+    <main id="main">
+      <button onclick="wsConnect();">ws connect</button>
+      <button onclick="wsDisconnect();">ws disconnect</button>
+      <span class="val_area" id="msg_connect"></span>
 
-  <br><button onclick="btnGetSpeed();">get speed</button>
-  <span class="val_area" id="msg_get_speed" ></span>
-  <br><button onclick="btnGetEngineRPM();">get engine RPM</button>
-  <span class="val_area" id="msg_get_rpm"></span>
-  <br><button onclick="btnGetSteeringAngle();">get steering angle</button>
-  <span class="val_area" id="msg_get_steer"></span>
-  <br>
+      <br><button onclick="btnAuthorize();">authorize</button>
+      <span class="val_area" id="msg_authorize"></span>
+      <br><button onclick="btnGetVssFile();">get VSS</button>
+      <span class="val_area" id="msg_get_vss"></span>
+      <br>
 
-  <br><button onclick="btnSetDoorRow1RightLock();">set DoorLock(Row1-Right)</button>
-  <input type="text" class="val_area" id="txt_set_doorRow1RightLock" ></input>
-  <br><button onclick="btnGetDoorRow1RightLock();">get DoorLock(Row1-Right)</button>
-  <span class="val_area" id="msg_get_doorRow1RightLock" ></span>
+      <br><button onclick="btnGetSpeed();">get speed</button>
+      <span class="val_area" id="msg_get_speed" ></span>
+      <br><button onclick="btnGetEngineRPM();">get engine RPM</button>
+      <span class="val_area" id="msg_get_rpm"></span>
+      <br><button onclick="btnGetSteeringAngle();">get steering angle</button>
+      <span class="val_area" id="msg_get_steer"></span>
+      <br>
 
-  <br><button onclick="btnSetHVACRow1RightTemp();">set HVACTemp(Row1-Right)</button>
-  <input type="text" class="val_area" id="txt_set_hvacRow1RightTemp"></input>
-  <br><button onclick="btnGetHVACRow1RightTemp();">get HVACTemp(Row1-Right)</button>
-  <span class="val_area" id="msg_get_hvacRow1RightTemp"></span>
-  <br>
+      <br><button onclick="btnSetDoorRow1RightLock();">set DoorLock(Row1-Right)</button>
+      <input type="text" class="val_area" id="txt_set_doorRow1RightLock" ></input>
+      <br><button onclick="btnGetDoorRow1RightLock();">get DoorLock(Row1-Right)</button>
+      <span class="val_area" id="msg_get_doorRow1RightLock" ></span>
 
-  <br><button onclick="btnSubscribeSpeed();">subscribe speed</button>
-  <button onclick="btnUnsubscribeSpeed();">unsubscribe</button>
-  <span class="val_area" id="msg_sub_speed"></span>
-  <br><button onclick="btnSubscribeEngineRpm();">subscribe engine RPM</button>
-  <button onclick="btnUnsubscribeEngineRpm();">unsubscribe</button>
-  <span class="val_area" id="msg_sub_rpm"></span>
-  <br><button onclick="btnSubscribeSteerAngle();">subscribe steer angle</button>
-  <button onclick="btnUnsubscribeSteerAngle();">unsubscribe</button>
-  <span class="val_area" id="msg_sub_steer"></span>
-  <br>
+      <br><button onclick="btnSetHVACRow1RightTemp();">set HVACTemp(Row1-Right)</button>
+      <input type="text" class="val_area" id="txt_set_hvacRow1RightTemp"></input>
+      <br><button onclick="btnGetHVACRow1RightTemp();">get HVACTemp(Row1-Right)</button>
+      <span class="val_area" id="msg_get_hvacRow1RightTemp"></span>
+      <br>
 
-  <!-- use VSS data -->
-  <br><span id="span_path">data path: </span><select id="sel_path">
-    <option value="">Sample</option>
-  </select>
-  <br><span class="msg_vss_desc" id="msg_vss_desc1"></span>
-  <br><span class="msg_vss_desc" id="msg_vss_desc2"></span>
-  <br>
-  <button onclick="btnGetVss();">get</button>
-  <button onclick="btnSubscribeVss();">subscribe</button>
-  <button onclick="btnUnsubscribeVss();">unsubscribe</button><br>
-  <button onclick="btnSetVss();">set</button>
-  <input type="text" class="val_area" id="txt_vss_set" ></input>
-  <br>
-  <button onclick="clearVssMsgArea();">clearMsgArea</button>
-  <div id="msg_vss"></div>
+      <br><button onclick="btnSubscribeSpeed();">subscribe speed</button>
+      <button onclick="btnUnsubscribeSpeed();">unsubscribe</button>
+      <span class="val_area" id="msg_sub_speed"></span>
+      <br><button onclick="btnSubscribeEngineRpm();">subscribe engine RPM</button>
+      <button onclick="btnUnsubscribeEngineRpm();">unsubscribe</button>
+      <span class="val_area" id="msg_sub_rpm"></span>
+      <br><button onclick="btnSubscribeSteerAngle();">subscribe steer angle</button>
+      <button onclick="btnUnsubscribeSteerAngle();">unsubscribe</button>
+      <span class="val_area" id="msg_sub_steer"></span>
+      <br>
 
-  <br><br>
-  <button onclick="clearMsgArea();">clearMsgArea</button>
-  <div id="msg"></div>
+      <!-- use VSS data -->
+      <br><span id="span_path">data path: </span><select id="sel_path">
+        <option value="">Sample</option>
+      </select>
+      <br><span class="msg_vss_desc" id="msg_vss_desc1"></span>
+      <br><span class="msg_vss_desc" id="msg_vss_desc2"></span>
+      <br>
+      <button onclick="btnGetVss();">get</button>
+      <button onclick="btnSubscribeVss();">subscribe</button>
+      <button onclick="btnUnsubscribeVss();">unsubscribe</button><br>
+      <button onclick="btnSetVss();">set</button>
+      <input type="text" class="val_area" id="txt_vss_set" ></input>
+      <br>
+      <button onclick="clearVssMsgArea();">clearMsgArea</button>
+      <div id="msg_vss"></div>
+
+    </main>
+    <div id="right">
+      <button onclick="clearMsgArea();">clearMsgArea</button>
+      <div id="msg"></div>
+    </div>
+  </div>
 
   <script type="text/javascript">
   var LocalHostIP = "127.0.0.1";
@@ -616,7 +646,7 @@
   }
 
   function showInMsgArea(msgText) {
-    showInMsgAreaById(msgText, 'msg', 5000);
+    showInMsgAreaById(msgText, 'msg', 3000);
   }
   function showInVssMsgArea(value, action, path) {
     var msgText = action + " : " + path + "<br>==> value : "+value;
