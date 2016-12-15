@@ -44,8 +44,18 @@ var VSSvrPort = 3001;
 // =========================
 var fs = require('fs');
 var httpsvr = require('http').createServer(function(req, res) {
-  res.writeHead(200, {"Content-Type":"text/html"});
-  var output = fs.readFileSync("./client.html", "utf-8");
+  var output;
+  console.log("httpsvr: req.url = "+req.url);
+  switch (req.url) {
+    case '/vss.json':
+      output = fs.readFileSync("./vss.json", "utf-8");
+      res.writeHead(200, {"Content-Type":"application/json"});
+      break;
+    default:
+      output = fs.readFileSync("./client.html", "utf-8");
+      res.writeHead(200, {"Content-Type":"text/html"});
+      break;
+  }
   res.end(output);
 }).listen(HttpSvrPort);
 
@@ -172,8 +182,8 @@ var g_extMockDataSrc = (function() {
 })();
 
 if (dataSrc === EXT_MOCK_SERVER) {
-  var WebSocketClient= require('websocket').client;
-  var wsClient = new WebSocketClient();
+  var modWsClient= require('websocket').client;
+  var wsClient = new modWsClient();
   wsClient.on('connect', g_extMockDataSrc.connectHandler);
   console.log("g_extMockDataSrc.svrUrl= " + g_extMockDataSrc.svrUrl);
   wsClient.connect(g_extMockDataSrc.svrUrl,'');
@@ -263,8 +273,8 @@ var g_extSIPDataSrc = {
 }
 
 if (dataSrc === EXT_SIP_SERVER) {
-  var sockioClient = require('socket.io-client');
-  var sioClient = sockioClient.connect(g_extSIPDataSrc.svrUrl);
+  var modSioClient = require('socket.io-client');
+  var sioClient = modSioClient.connect(g_extSIPDataSrc.svrUrl);
 
   if (sioClient != undefined) {
     sioClient.on("vehicle data", function(sipData) {
@@ -394,7 +404,7 @@ wssvr.on('connection', function(ws) {
   // for connecting to outside data source
   g_ws.on('message', function(message) {
     var obj = JSON.parse(message);
-    //console.log("ws.on:message: obj= " + message);
+    console.log("ws.on:message: obj= " + message);
     //console.log("  :action=" + obj.action);
 
     // for 'get'

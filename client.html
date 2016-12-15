@@ -4,9 +4,12 @@
   <meta charset="UTF-8">
   <title>VSSS client</title>
   <style>
-    div#msg { height:600px; width:1500px; background-color:lightgrey; font-size:14px;}
+    #msg { height:600px; width:1500px; background-color:lightgrey; font-size:14px;}
+    #msg_vss { height:100px; width:500px; background-color:lightgrey; font-size:14px;}
+    .msg_vss_desc { height: 20px; width:500px; background-color:lightgrey; font-size:14px; display:inline-block;}
     .val_area { height: 20px; width:150px; background-color:lightgrey; font-size:14px; display:inline-block;}
     #server_info {height:20px; width:500px; font-size:13px;}
+    #span_path {height:20px; width:20px; font-size:13px;}
   </style>
 </head>
 
@@ -14,58 +17,84 @@
   <h3> Vehicle Signal Server Spec Trial Implementaion </h3>
   <span id="server_info"></span>
   <br>
-  <br><button onclick="wsConnect();">ws connect</button><button onclick="wsDisconnect();">ws disconnect</button>
+  <br><button onclick="wsConnect();">ws connect</button>
+  <button onclick="wsDisconnect();">ws disconnect</button>
   <span class="val_area" id="msg_connect"></span>
   <br>
 
-  <br><button onclick="wsAuthorize();">authorize</button>
+  <br><button onclick="btnAuthorize();">authorize</button>
   <span class="val_area" id="msg_authorize"></span>
-  <br><button onclick="wsGetVss();">get VSS</button>
+  <br><button onclick="btnGetVssFile();">get VSS</button>
   <span class="val_area" id="msg_get_vss"></span>
   <br>
 
-  <br><button onclick="wsGetSpeed();">get speed</button>
+  <br><button onclick="btnGetSpeed();">get speed</button>
   <span class="val_area" id="msg_get_speed" ></span>
-  <br><button onclick="wsGetEngineRPM();">get engine RPM</button>
+  <br><button onclick="btnGetEngineRPM();">get engine RPM</button>
   <span class="val_area" id="msg_get_rpm"></span>
-  <br><button onclick="wsGetSteeringAngle();">get steering angle</button>
+  <br><button onclick="btnGetSteeringAngle();">get steering angle</button>
   <span class="val_area" id="msg_get_steer"></span>
   <br>
 
-  <br><button onclick="wsSetDoorRow1RightLock();">set DoorLock(Row1-Right)</button>
+  <br><button onclick="btnSetDoorRow1RightLock();">set DoorLock(Row1-Right)</button>
   <input type="text" class="val_area" id="txt_set_doorRow1RightLock" ></input>
-  <br><button onclick="wsGetDoorRow1RightLock();">get DoorLock(Row1-Right)</button>
+  <br><button onclick="btnGetDoorRow1RightLock();">get DoorLock(Row1-Right)</button>
   <span class="val_area" id="msg_get_doorRow1RightLock" ></span>
 
-  <br><button onclick="wsSetHVACRow1RightTemp();">set HVACTemp(Row1-Right)</button>
+  <br><button onclick="btnSetHVACRow1RightTemp();">set HVACTemp(Row1-Right)</button>
   <input type="text" class="val_area" id="txt_set_hvacRow1RightTemp"></input>
-  <br><button onclick="wsGetHVACRow1RightTemp();">get HVACTemp(Row1-Right)</button>
+  <br><button onclick="btnGetHVACRow1RightTemp();">get HVACTemp(Row1-Right)</button>
   <span class="val_area" id="msg_get_hvacRow1RightTemp"></span>
   <br>
 
-  <br><button onclick="btnSubscribeSpeed();">subscribe speed</button><button onclick="btnUnsubscribeSpeed();">unsubscribe</button>
+  <br><button onclick="btnSubscribeSpeed();">subscribe speed</button>
+  <button onclick="btnUnsubscribeSpeed();">unsubscribe</button>
   <span class="val_area" id="msg_sub_speed"></span>
-  <br><button onclick="btnSubscribeEngineRpm();">subscribe engine RPM</button><button onclick="btnUnsubscribeEngineRpm();">unsubscribe</button>
+  <br><button onclick="btnSubscribeEngineRpm();">subscribe engine RPM</button>
+  <button onclick="btnUnsubscribeEngineRpm();">unsubscribe</button>
   <span class="val_area" id="msg_sub_rpm"></span>
-  <br><button onclick="btnSubscribeSteerAngle();">subscribe steer angle</button><button onclick="btnUnsubscribeSteerAngle();">unsubscribe</button>
+  <br><button onclick="btnSubscribeSteerAngle();">subscribe steer angle</button>
+  <button onclick="btnUnsubscribeSteerAngle();">unsubscribe</button>
   <span class="val_area" id="msg_sub_steer"></span>
   <br>
 
+  <!-- use VSS data -->
+  <br><span id="span_path">data path: </span><select id="sel_path">
+    <option value="">Sample</option>
+  </select>
+  <br><span class="msg_vss_desc" id="msg_vss_desc1"></span>
+  <br><span class="msg_vss_desc" id="msg_vss_desc2"></span>
   <br>
+  <button onclick="btnGetVss();">get</button>
+  <button onclick="btnSubscribeVss();">subscribe</button>
+  <button onclick="btnUnsubscribeVss();">unsubscribe</button><br>
+  <button onclick="btnSetVss();">set</button>
+  <input type="text" class="val_area" id="txt_vss_set" ></input>
+  <br>
+  <button onclick="clearVssMsgArea();">clearMsgArea</button>
+  <div id="msg_vss"></div>
+
+  <br><br>
   <button onclick="clearMsgArea();">clearMsgArea</button>
   <div id="msg"></div>
-  <script type="text/javascript">
 
-  //var WSSvrIP = "127.0.0.1";
+  <script type="text/javascript">
+  var LocalHostIP = "127.0.0.1";
   var WSSvrIP = "10.5.162.79";
   var WSSvrPort = "3001";
 
+  var VSS_FILENAME = "vss.json";
+
   var g_vehicle = null; // only one WebSocket connection is allowed
   var g_reqTable = null;
+  var g_vssObj = null; // VSS object loaded from vss.json
   var g_ui = {
     speedReqId : null,
     engineRpmReqId : null,
     steerAngleReqId : null,
+    vssSubscribeReqId : [], //vssアイテムsubscribe時に、path:reqId のhashを格納
+
+    //2重のsubscribe禁止のためボタンをlockしている
     clearSubscribeBtnLock : function(reqId) {
       if (reqId == this.speedReqId) {
         this.speedReqId = null;
@@ -92,20 +121,22 @@
   // =========================
   // memo: all requests should be stored in this table
   g_reqTable = {
-    subIdHash: {},
-    requestHash: {},
+    subIdHash: {},    // reqId:subId のセットを登録
+    requestHash: {},  // reqId:reqObj のセットを登録
 
-    addReqByReqId: function(reqId, reqObj) {
+    // reqId:reqObjをreqHashに追加
+    addReqByReqId: function(reqId, reqItem) {
       showInMsgArea("addReqByReqId: reqId="+reqId);
       if (this.requestHash[reqId] != undefined) {
         showInMsgArea("--:Error: requestId already used. reqId="+reqId);
         return false;
       }
-      this.requestHash[reqId] = reqObj;
+      this.requestHash[reqId] = reqItem;
       showInMsgArea("--:EntryNum=" + Object.keys(this.requestHash).length);
       return true;
     },
 
+    // reqId:reqObj を reqHashから削除。subHashにも登録があれば削除
     delReqByReqId: function(reqId) {
       showInMsgArea("delReqByReqId: reqId="+reqId);
       if (this.requestHash[reqId] == undefined)
@@ -121,12 +152,14 @@
       return true;
     },
 
+    // reqIdからreqObjを取得する
     getReqByReqId: function(reqId) {
       //showInMsgArea("getReqByReqId: reqId="+reqId);
       if (this.requestHash[reqId] == undefined) return false;
       return this.requestHash[reqId];
     },
 
+    // subIdからreqObjを取得する
     getReqBySubId: function(subId) {
       //showInMsgArea("getReqBySubId: subId="+subId);
       var reqId = this.subIdHash[subId];
@@ -134,6 +167,7 @@
       return this.getReqByReqId(reqId);
     },
 
+    //requestHashに登録済みの reqId:reqObj に、対応するsubscriptionIdを追加する
     setSubIdToReq: function(reqId, subId) {
       showInMsgArea("setSubIdToReq: reqId="+reqId+" subId="+subId);
       // this func is only for 'subscribe' request.
@@ -153,16 +187,19 @@
       //this.dispSubIdHash();
       return true;
     },
+    // reqIdから対応するsubIdを取得する
     getSubIdByReqId: function(rId) {
       var obj = this.requestHash[rId];
       if (obj == undefined) return null;
       return obj.subscriptionId;
     },
+    // subIdから対応するreqIdを取得する
     getReqIdBySubId: function(sId) {
       var reqId = this.subIdHash[sId]; //subIdHash はダブリなどないはず
       if (reqId == undefined) return null;
       return reqId;
     },
+    // reqTableをクリアする
     clearReqTable: function() {
       showInMsgArea("clearReqTable:");
       for (var i in this.requestHash) {
@@ -204,29 +241,32 @@
     showInMsgArea("--: <== " + event.data);
 
     var msg = JSON.parse(event.data);
-    var reqObj=null, action=null, reqId=null, subId=null;
+    var queItem=null, reqObj=null, action=null, reqId=null, subId=null;
     if (msg.requestId != undefined) {
       reqId = msg.requestId;
-      reqObj = g_reqTable.getReqByReqId(reqId);
-    } else if (msg.subscriptionId != undefined) {
+      queItem = g_reqTable.getReqByReqId(reqId);
+      reqObj = queItem.reqObj;
+    } else if (msg.subscriptionId != undefined) { 
+      //reqIdなし、subIdあり＝subscribe notification の場合
       subId = msg.subscriptionId;
-      reqObj = g_reqTable.getReqBySubId(subId);
+      queItem = g_reqTable.getReqBySubId(subId);
+      reqObj = queItem.reqObj;
     }
     action = reqObj.action;
     //showInMsgArea("--:action="+action);
 
     // case of 'get'
     if (action === "get") {
-      showMsgByActionAndPath(msg.value, reqObj.action, reqObj.path);
+      showMsgByActionAndPath(msg.value, reqObj.action, reqObj.path, queItem.dispId);
       // delete request from requestHash. delete even in error case
       g_reqTable.delReqByReqId(reqId);
     // case of 'set'
     } else if (action === "set") {
-      //TODO
+      g_reqTable.delReqByReqId(reqId);
 
     // case of 'subscribe'
     } else if (action === "subscribe") {
-      // memo: subscribeの場合は、msgはresponseかnotification
+      // memo: subscribeのincomming msgはresponseかnotification
       //       response => reqId, subId両方あり
       //       notifica => subIdのみあり
       //       subscribeのrequestHashエントリの削除はunsubscribeによる
@@ -246,13 +286,13 @@
       } else if (isSubscriptionNotification(msg)) {
         // case of subscribeNotification
         //showInMsgArea("--:msgtype: SubscriptionNotification");
-        showMsgByActionAndPath(msg.value, reqObj.action, reqObj.path);
+        showMsgByActionAndPath(msg.value, reqObj.action, reqObj.path, queItem.dispId);
 
       } else if (isSubscriptionNotificationError(msg)) {
         //showInMsgArea("--:msgtype: SubscriptionNotificationError");
         // noting to do special here. continu subscribe.
       } else {
-        //noone come here
+        //no one come here
         //showInMsgArea("--:msgtype: Subscribe: Unknown");
       }
 
@@ -320,79 +360,84 @@
   // TODO:
 
   // === get ===
-  function wsGetItem(path) {
+  function wsGetItem(_path, _dispId) {
     //showInMsgArea("wsGetItem:");
     if (g_vehicle != null && g_vehicle.readyState === 1) {
       var reqId = getUniqueReqId();
-      var req = {"action": "get", "path": path, "requestId":reqId};
-      g_reqTable.addReqByReqId(reqId, req);
+      var req = {"action": "get", "path": _path, "requestId":reqId};
+      var item = {"reqObj": req, "dispId": _dispId}; //戻り値の表示先IDを追加
+      g_reqTable.addReqByReqId(reqId, item);
       var json_str = JSON.stringify(req);
       g_vehicle.send(json_str);
       showInMsgArea("--: ==> " + json_str);
     }
   }
-  function wsGetSpeed() {
-    wsGetItem("Signal.Drivetrain.Transmission.Speed");
+  function btnGetSpeed() {
+    wsGetItem("Signal.Drivetrain.Transmission.Speed", "msg_get_speed" );
   }
-  function wsGetEngineRPM() {
-    wsGetItem("Signal.Drivetrain.InternalCombustionEngine.RPM");
+  function btnGetEngineRPM() {
+    wsGetItem("Signal.Drivetrain.InternalCombustionEngine.RPM", "msg_get_rpm");
   }
-  function wsGetSteeringAngle() {
-    wsGetItem("Signal.Chassis.SteeringWheel.Angle");
+  function btnGetSteeringAngle() {
+    wsGetItem("Signal.Chassis.SteeringWheel.Angle", "msg_get_steer");
   }
 
   // === set ===
-  function wsSetItem(path,value) {
+  // set にはdispIdは不要かも。。
+  function wsSetItem(path,value, _dispId) {
     showInMsgArea("wsSetItem:");
     if (g_vehicle != null && g_vehicle.readyState === 1) {
       var reqId = getUniqueReqId();
       var req = {"action": "set", "path": path, "value": value, "requestId":reqId};
-      g_reqTable.addReqByReqId(reqId, req);
+      var item = {"reqObj": req, "dispId": _dispId}; //戻り値の表示先IDを追加
+      g_reqTable.addReqByReqId(reqId, item);
       var json_str = JSON.stringify(req);
       g_vehicle.send(json_str);
       showInMsgArea("--: ==> " + json_str);
     }
   }
-  function wsSetDoorRow1RightLock() {
+  function btnSetDoorRow1RightLock() {
     var value = document.getElementById("txt_set_doorRow1RightLock").value;
-    //showInMsgArea("wsSetDoorRow1RightLock=" + value);
-    wsSetItem("Signal.Cabin.Door.Row1.Right.IsLocked", value);
+    //showInMsgArea("btnSetDoorRow1RightLock=" + value);
+    wsSetItem("Signal.Cabin.Door.Row1.Right.IsLocked", value, "txt_set_doorRow1RightLock");
   }
-  function wsGetDoorRow1RightLock() {
-    wsGetItem("Signal.Cabin.Door.Row1.Right.IsLocked");
+  function btnGetDoorRow1RightLock() {
+    wsGetItem("Signal.Cabin.Door.Row1.Right.IsLocked", "msg_get_doorRow1RightLock");
   }
 
-  function wsSetHVACRow1RightTemp() {
+  function btnSetHVACRow1RightTemp() {
     var value = document.getElementById("txt_set_hvacRow1RightTemp").value;
-    wsSetItem("Signal.Cabin.HVAC.Row1.RightTemperature", value);
+    wsSetItem("Signal.Cabin.HVAC.Row1.RightTemperature", value, "txt_set_hvacRow1RightTemp");
   }
-  function wsGetHVACRow1RightTemp() {
-    wsGetItem("Signal.Cabin.HVAC.Row1.RightTemperature");
+  function btnGetHVACRow1RightTemp() {
+    wsGetItem("Signal.Cabin.HVAC.Row1.RightTemperature", "msg_get_hvacRow1RightTemp");
   }
 
   // === subscribe/unsubscribe ===
-  function wsSubscribeItem(path, reqId) {
+  function wsSubscribeItem(path, reqId, _dispId) {
     showInMsgArea("wsSubscribeItem: reqId = " + reqId);
     if (g_vehicle != null && g_vehicle.readyState === 1) {
       var req ={"action": "subscribe", "path": path, "filters":"", "requestId":reqId};
+      var item = {"reqObj": req, "dispId": _dispId}; //戻り値の表示先IDを追加
+      g_reqTable.addReqByReqId(reqId, item);
       var json_str = JSON.stringify(req);
       g_vehicle.send(json_str);
       showInMsgArea("--: ==> " + json_str);
-      g_reqTable.addReqByReqId(reqId, req);
       return true;
     } else {
       return false;
     }
   }
-  function wsUnsubscribeItem(path, subId) {
+  function wsUnsubscribeItem(path, subId, _dispId) {
     showInMsgArea("wsUnsubscribeItem: subId=" + subId);
     if (g_vehicle != null && g_vehicle.readyState === 1) {
       var reqId = getUniqueReqId(); //reqIdはunsub用に新しいものを使用
       var req = {"action": "unsubscribe", "requestId":reqId, "subscriptionId":subId};
+      var item = {"reqObj": req, "dispId": _dispId}; //戻り値の表示先IDを追加
+      g_reqTable.addReqByReqId(reqId, item);
       var json_str = JSON.stringify(req);
       g_vehicle.send(json_str);
       showInMsgArea("--: ==> " + json_str);
-      g_reqTable.addReqByReqId(reqId, req);
     }
   }
 
@@ -403,13 +448,13 @@
     }
     g_ui.speedReqId = getUniqueReqId();
     var path = "Signal.Drivetrain.Transmission.Speed";
-    var ret = wsSubscribeItem(path, g_ui.speedReqId);
+    var ret = wsSubscribeItem(path, g_ui.speedReqId, "msg_sub_speed");
     if (!ret) g_ui.speedReqId = null;
   }
   function btnUnsubscribeSpeed() {
     var path = "Signal.Drivetrain.Transmission.Speed";
     var targ_subId = g_reqTable.getSubIdByReqId(g_ui.speedReqId); //unsub対象のsubIdを取得
-    wsUnsubscribeItem(path, targ_subId);
+    wsUnsubscribeItem(path, targ_subId, "msg_sub_speed");
   }
 
   function btnSubscribeEngineRpm() {
@@ -418,14 +463,14 @@
       return;
     }
     g_ui.engineRpmReqId = getUniqueReqId();
-    var path = "Signal.Drivetrain.InternalCombustionEngine.RPM"
-    var ret = wsSubscribeItem(path, g_ui.engineRpmReqId);
+    var path = "Signal.Drivetrain.InternalCombustionEngine.RPM";
+    var ret = wsSubscribeItem(path, g_ui.engineRpmReqId, "msg_sub_rpm");
     if (!ret) g_ui.engineRpmReqId = null;
   }
   function btnUnsubscribeEngineRpm() {
     var path = "Signal.Drivetrain.InternalCombustionEngine.RPM"
-    var targ_subId = g_reqTable.getSubIdByReqId(g_ui.engineRpmReqId); //unsub対象のsubIdを取得
-    wsUnsubscribeItem(path, targ_subId);
+    var targ_subId = g_reqTable.getSubIdByReqId(g_ui.engineRpmReqId);
+    wsUnsubscribeItem(path, targ_subId, "msg_sub_rpm");
   }
 
   function btnSubscribeSteerAngle() {
@@ -435,13 +480,79 @@
     }
     g_ui.steerAngleReqId = getUniqueReqId();
     var path = "Signal.Chassis.SteeringWheel.Angle";
-    var ret = wsSubscribeItem(path, g_ui.steerAngleReqId);
+    var ret = wsSubscribeItem(path, g_ui.steerAngleReqId, "msg_sub_steer");
     if (!ret) g_ui.steerAngleReqId = null;
   }
   function btnUnsubscribeSteerAngle() {
     var path = "Signal.Chassis.SteeringWheel.Angle";
-    var targ_subId = g_reqTable.getSubIdByReqId(g_ui.steerAngleReqId); //unsub対象のsubIdを取得
-    wsUnsubscribeItem(path, targ_subId);
+    var targ_subId = g_reqTable.getSubIdByReqId(g_ui.steerAngleReqId);
+    wsUnsubscribeItem(path, targ_subId, "msg_sub_steer");
+  }
+
+  // === VSS item: get/set/sub/unsub ===
+  function btnGetVss() {
+    var path = getSelectedVssPath();
+    wsGetItem(path, "msg_vss");
+  }
+  function btnSetVss() {
+    var path = getSelectedVssPath();
+    var value = getVssTextVal();
+    wsSetItem(path,value, "msg_vss");
+  }
+  function btnSubscribeVss() {
+    var path = getSelectedVssPath();
+    var reqId = getUniqueReqId();
+    g_ui.vssSubscribeReqId[path] = reqId; //save path:reqId in global
+    wsSubscribeItem(path, reqId, "msg_vss");
+  }
+  function btnUnsubscribeVss() {
+    var path = getSelectedVssPath();
+    var targ_reqId = g_ui.vssSubscribeReqId[path];
+    if (targ_reqId == undefined) {
+      showInMsgArea("This VSS item is not subscribed");
+      return;
+    } else {
+      delete g_ui.vssSubscribeReqId[path];
+    }
+    var targ_subId = g_reqTable.getSubIdByReqId(targ_reqId);
+    wsUnsubscribeItem(path, targ_subId, "msg_vss");
+  }
+  function getSelectedVssPath() {
+    var sel_path = document.getElementById("sel_path");
+    var idx = sel_path.selectedIndex;
+    var val = sel_path[idx].value;
+    return val;
+  }
+  function getVssTextVal() {
+    var val = document.getElementById("txt_vss_set").value;
+    return val;
+  }
+  function selVssOnChange() {
+    var path = getSelectedVssPath();
+    if (path=='' || path=='sample') return;
+    if (g_vssObj == null) return;
+
+    var leaf = getLeaf(g_vssObj, path);
+
+    var _type = leaf.type!=undefined ? leaf.type:' - ';
+    var _unit = leaf.unit!=undefined ? leaf.unit:' - ';
+    var _max = leaf.max!=undefined ?   leaf.max:' - ';
+    var _min = leaf.min!=undefined ?   leaf.min:' - ';
+    var _desc = leaf.desc!=undefined ? leaf.desc:' - ';
+    
+    var _enum = (function(){
+      if(leaf.enum!=undefined && leaf.enum.length>0)
+        return leaf.enum.join(' / ');
+      else
+        return ' - ';
+    })();
+
+    var txt1 = "type: "+_type+", unit: "+_unit+", max: "+_max+", min: "+_min;
+    var txt2 = "enum: "+_enum;
+    var vss_desc1 = document.getElementById("msg_vss_desc1");
+    var vss_desc2 = document.getElementById("msg_vss_desc2");
+    vss_desc1.innerHTML = txt1;
+    vss_desc2.innerHTML = txt2;
   }
 
   // *** Authorize *** [TODO]
@@ -505,59 +616,32 @@
   }
 
   function showInMsgArea(msgText) {
-    var targ = document.getElementById('msg');
+    showInMsgAreaById(msgText, 'msg', 5000);
+  }
+  function showInVssMsgArea(value, action, path) {
+    var msgText = action + " : " + path + "<br>==> value : "+value;
+    showInMsgAreaById(msgText, 'msg_vss', 200);
+  }
+  function showInMsgAreaById(msgText, id, size_limit) {
+    var targ = document.getElementById(id);
     var oldText = targ.innerHTML;
-    oldText = oldText.substring(0, 5000);
+    oldText = oldText.substring(0, size_limit);
     var newText = msgText + "<br>" + oldText;
     targ.innerHTML = newText;
   }
-
   function showMsgById(msgText, idTarg) {
     var targ = document.getElementById(idTarg);
     targ.innerHTML = msgText;
   }
 
-  //TODO: need automatic way
-  // 一つ一つ書いてられないので仕組みを作ること
-  // ただし、このUIでどこまでやる必要があるか？
-  function showMsgByActionAndPath(value, action, path) {
-    var targ_id = null;
-    if (path === "Signal.Drivetrain.Transmission.Speed" ) {
-      if (action === "get")
-        targ_id = "msg_get_speed";
-      else if (action === "subscribe")
-        targ_id = "msg_sub_speed";
-
-    } else if (path === "Signal.Drivetrain.InternalCombustionEngine.RPM" ) {
-      if (action === "get")
-        targ_id = "msg_get_rpm";
-      else if (action === "subscribe")
-        targ_id = "msg_sub_rpm";
-    } else if (path === "Signal.Chassis.SteeringWheel.Angle" ) {
-      if (action === "get")
-        targ_id = "msg_get_steer";
-      else if (action === "subscribe")
-        targ_id = "msg_sub_steer";
-
-    } else if (path === "Signal.Cabin.Door.Row1.Right.IsLocked" ) {
-      if (action === "get") {
-        targ_id = "msg_get_doorRow1RightLock";
-      } else if (action === "set") {
-        //do nothing
-      } else if (action === "subscribe") {
-        //do nothing
-      }
-
-    } else if (path === "Signal.Cabin.HVAC.Row1.RightTemperature" ) {
-      if (action === "get") {
-        targ_id = "msg_get_hvacRow1RightTemp";
-      } else if (action === "set") {
-      } else if (action === "subscribe") {
-      }
-
+  function showMsgByActionAndPath(value, action, path, targ_id) {
+    if (targ_id === 'msg_vss') {
+      //exceptional case
+      showInVssMsgArea(value, action, path);
+    } else {
+      var targ = document.getElementById(targ_id);
+      targ.innerHTML = value;
     }
-    var targ = document.getElementById(targ_id);
-    targ.innerHTML = value;
   }
 
   function showConnectMsg(msgText) {
@@ -567,6 +651,73 @@
   function clearMsgArea() {
     var targ = document.getElementById('msg');
     targ.innerHTML = "";
+  }
+  function clearVssMsgArea() {
+    var targ = document.getElementById('msg_vss');
+    targ.innerHTML = "";
+  }
+
+  function createPathArry(_vssObj) {
+    var root = _vssObj;
+    var dbg_depth = 0;
+    var pathArry = [];
+
+    Object.keys(root).forEach(function(key) {
+      var node = root[key];
+      traverse(key, node, '', leafCallback, dbg_depth);
+    });
+
+    return pathArry;
+
+    // traverseしてleafに到達したら行う処理
+    function leafCallback(_key, _node, _path) {
+      var item = {'path':_path, 'node':_node};
+      pathArry.push(item);
+    }
+  }
+
+  // VSS object の tree をなめる動作
+  function traverse(_key, _node, _path, _leafCallback, _depth) {
+    var depth = _depth+1;
+    var path = _path=='' ? _key : _path+'.'+_key;
+    if (_node.type == undefined) {
+      return;
+    }
+
+    if (_node.type === 'branch') {
+      //console.log( Array(depth+1).join('    ')+"branch:" + _key);
+      //branch case
+      if (_node.children) {
+        // children以下の要素についてtraverseを行う
+        Object.keys(_node.children).forEach(function(key) {
+            var node = _node.children[key];
+            traverse(key, node, path, _leafCallback, depth);
+            });
+      } else {
+        //no children. do nothing.
+      }
+    } else {
+      //leaf case
+      //console.log( Array(depth+1).join('    ')+"leaf:" + _key);
+      _leafCallback(_key, _node, path);
+    }
+  }
+
+  // get leaf from VSS object tree
+  function getLeaf(_dataObj, _path) {
+    var pathArry = _path.split(".");
+    var obj = _dataObj;
+    for (var i=0, len=pathArry.length; i<len; i++) {
+      if (obj.children != undefined)
+        obj = obj.children;
+      if (obj[pathArry[i]] != undefined) {
+        obj = obj[pathArry[i]];
+      } else {
+        //存在しないパス
+        return undefined;
+      }
+    }
+    return obj;
   }
 
   // =============
@@ -579,6 +730,25 @@
     var msg_areas = document.getElementsByClassName("val_area");
     for (var i=0; i<msg_areas.length; i++) {
       msg_areas.item(i).innerHTML = "---";
+    }
+
+    //load vss.json
+    {
+      var xhr = new XMLHttpRequest();
+      xhr.open("get", "/"+VSS_FILENAME, true);
+      xhr.onload = function() {
+        g_vssObj = JSON.parse(this.responseText);
+        var pathArry = createPathArry(g_vssObj);
+        for (var i=0; i<pathArry.length; i++) {
+          var opt = document.createElement("option");
+          opt.innerText = pathArry[i].path;
+          opt.value  = pathArry[i].path;
+          document.getElementById("sel_path").appendChild(opt);
+        }
+        var sel = document.getElementById("sel_path");
+        sel.onchange = function(e){ selVssOnChange();};
+      }
+      xhr.send(null);
     }
   })();
 
