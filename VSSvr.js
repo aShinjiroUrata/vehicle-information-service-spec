@@ -205,7 +205,15 @@ var g_extSIPDataSrc = {
     //console.log("convertFormatFromSIPToVSS: sipData = " + sipData);
     //console.log("convertFormatFromSIPToVSS: ");
     var vssData;
-    var sipObj = JSON.parse(sipData);
+    var sipObj;
+    try {
+      sipObj = JSON.parse(sipData);
+    } catch(e) {
+      //iregurlar Json case
+      console.log("  :received irregular Json messaged. ignored.");
+      console.log("  :Error = "+e);
+      return;
+    }
     var vehicleSpeed = this.getValueFromSIPObj(sipObj,"Vehicle.RunningStatus.VehicleSpeed.speed");
     var engineSpeed = this.getValueFromSIPObj(sipObj,"Vehicle.RunningStatus.EngineSpeed.speed");
     var steeringWheel = this.getValueFromSIPObj(sipObj,"Vehicle.RunningStatus.SteeringWheel.angle");
@@ -403,7 +411,14 @@ wssvr.on('connection', function(ws) {
 
   // for connecting to outside data source
   g_ws.on('message', function(message) {
-    var obj = JSON.parse(message);
+    var obj;
+    try {
+      obj = JSON.parse(message);
+    } catch (e) {
+      console.log("  :received irregular Json messaged. ignored.");
+      console.log("  :Error = "+e);
+      return;
+    }
     console.log("ws.on:message: obj= " + message);
     //console.log("  :action=" + obj.action);
 
@@ -501,7 +516,15 @@ wssvr.on('connection', function(ws) {
 function dataReceiveHandler(message) {
   //console.log("dataReceiveHandler: ");
   //console.log("  :message=" + message);
-  var obj = JSON.parse(message);
+  var obj;
+  try {
+    obj = JSON.parse(message);
+  } catch(e) {
+    //irregurlar Json case
+    console.log("  :received irregular Json messaged. ignored.");
+    console.log("  :Error = "+e);
+    return;
+  }
   var dataObj = obj.data;
   var setObj = obj.set;
 
