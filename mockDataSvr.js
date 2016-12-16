@@ -35,7 +35,13 @@ var g_updateList = [
 var fs = require('fs');
 
 //TODO: json ファイル名を引数で与える
-var vss = JSON.parse(fs.readFileSync('./vss.json', 'utf8'));
+var vss;
+try {
+  vss = JSON.parse(fs.readFileSync('./vss.json', 'utf8'));
+} catch(e) {
+  console.log("Irregular format of VSS json. Exit.");
+  return;
+}
 var g_dataObj = initDataObj(vss);
 
 // ===========================
@@ -79,7 +85,13 @@ dataSrcSvr.on('request', function(request) {
     if (msg.type === 'utf8') {
       //console.log('  :ws.on:message = '+ msg.utf8Data);
       // action==setなら、対応する値を保存する
-      var reqObj = JSON.parse(msg.utf8Data);
+      var reqObj;
+      try {
+        reqObj = JSON.parse(msg.utf8Data);
+      } catch(e) {
+        console.log("Irregular format request. ignore.");
+        return;
+      }
       if (reqObj.action === 'set') {
         //console.log('  :reqObj.path = '+ reqObj.path);
         //console.log('  :reqObj.value = '+ reqObj.value);

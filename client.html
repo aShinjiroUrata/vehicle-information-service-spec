@@ -270,7 +270,13 @@
     showInMsgArea("onWsMessage: ");
     showInMsgArea("--: <== " + event.data);
 
-    var msg = JSON.parse(event.data);
+    var msg;
+    try {
+      msg = JSON.parse(event.data);
+    } catch(e) {
+      showInMsgArea("Irregular Json received. Ignore.");
+      return;
+    }
     var queItem=null, reqObj=null, action=null, reqId=null, subId=null;
     if (msg.requestId != undefined) {
       reqId = msg.requestId;
@@ -767,7 +773,12 @@
       var xhr = new XMLHttpRequest();
       xhr.open("get", "/"+VSS_FILENAME, true);
       xhr.onload = function() {
-        g_vssObj = JSON.parse(this.responseText);
+        try {
+          g_vssObj = JSON.parse(this.responseText);
+        } catch(e) {
+          showInMsgArea("Irregural format of VSS Json. Need replace VSS Json and restart.");
+          return;
+        }
         var pathArry = createPathArry(g_vssObj);
         for (var i=0; i<pathArry.length; i++) {
           var opt = document.createElement("option");
