@@ -13,25 +13,26 @@ To use:
 1.Install packages
 - $npm install fs http ws websocket socket.io socket.io-client
 
-2.Edit VSSvr.js code
-- edit VSSvr's IP address by change VSSvrIP value.(change port if you like)
+2.Edit Vsss.js code
+- Vsss.js is prototype implementation of VSSS server
+- edit Vsss's IP address by change VsssIP value.(change port if you like)
 - select data source to connect
   - LOCAL_MOCK_DATA : to use hard coded data source driven by timer
-  - EXT_MOCK_SERVER : to use external websocket mock server 'mockDataSvr.js'
+  - EXT_MOCK_SERVER : to use external websocket mock server 'mockDataSrc.js'
   - EXT_SIP_SERVER  : to use websocket server which hosts actual vehicle data
                       developed for SIP hackathon.
 
-3.Start Vehicle Signal Server
-- $node VSSvr.js
-
-4.Open client app by browser via url= http://{VSSvrIP}:{HttpSvrPort}
-
-5.If EXT_MOCK_SERVER data source is selected, start external mock data source
-- edit IP, port in mockDataSvr.js to match with VSSvr.js
+3.If EXT_MOCK_SERVER data source is selected, start external mock data source
+- edit IP, port in mockDataSrc.js to match with Vsss.js
 - $node mockDataSrc.js
 
-6.If EXT_SIP_SERVER data source is selected, start SIP hackathon server
+4.If EXT_SIP_SERVER data source is selected, start SIP hackathon server
 - Open SIP hackathon server app by google chrome (#URL is not public)
 - enter roomID='room01' and submit
 - select drive data and start to play the data
 
+5.Start Vehicle Signal Server
+- $node Vsss.js
+
+6.Open client app by browser via url= http://{VsssIP}:{HttpSvrPort}
+  e.g. http://xx.xx.xx.xx:3000/

@@ -1,4 +1,4 @@
-// mockDataSvr.js
+// mockDataSrc.js
 // * This is data source WebSocket Server
 // * to be used as replacemnt of actual vehicle.
 // * Function is just to send data to Vehicle Signal Server.

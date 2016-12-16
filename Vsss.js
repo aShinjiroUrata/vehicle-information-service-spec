@@ -4,18 +4,18 @@
 // to use:
 // 1.Install packages
 //   $npm install ws socket.io
-// 2.Edit VSSvr.js code
-// - edit VSSvr's IP address by change VSSvrIP value.(change port if you like)
+// 2.Edit Vsss.js code
+// - edit Vsss's IP address by change VsssIP value.(change port if you like)
 // - select data source to connect
 //   - LOCAL_MOCK_DATA : to use hard coded data source driven by timer
 //   - EXT_MOCK_SERVER : to use external websocket mock server 'mockDataSvr.js'
 //   - EXT_SIP_SERVER  : to use websocket server which hosts actual vehicle data
 //                       developed for SIP hackathon.
 // 3.Start Vehicle Signal Server
-//   $node VSSvr.js
-// 4 Open client app by browser via url= http://{VSSvrIP}:{HttpSvrPort}
+//   $node Vsss.js
+// 4 Open test-ui app by browser via url= http://{VsssIP}:{HttpSvrPort}
 // 5.If EXT_MOCK_SERVER data source is selected, start external mock data source
-//   (*Edit IP, port in mockDataSvr.js to match with VSSvr.js)
+//   (*Edit IP, port in mockDataSvr.js to match with Vsss.js)
 //   $node mockDataSrc.js
 // 6.If EXT_SIP_SERVER data source is selected, start SIP hackathon server
 // - Open SIP hackathon server app by google chrome (*URL is not public)
@@ -34,13 +34,13 @@ var dataSrc = EXT_MOCK_SERVER;
 //var dataSrc = EXT_SIP_SERVER;
 
 // == Config this Vehicle Singal Server IP and Port Number here ==
-//var VSSvrIP = '127.0.0.1';
-var VSSvrIP = '10.5.162.79';
+//var VsssIP = '127.0.0.1';
+var VsssIP = '10.5.162.79';
 var HttpSvrPort = 3000;
-var VSSvrPort = 3001;
+var VsssPort = 3001;
 
 // =========================
-// == Publish client.html ==
+// == Publish test-ui.html ==
 // =========================
 var fs = require('fs');
 var httpsvr = require('http').createServer(function(req, res) {
@@ -52,7 +52,7 @@ var httpsvr = require('http').createServer(function(req, res) {
       res.writeHead(200, {"Content-Type":"application/json"});
       break;
     default:
-      output = fs.readFileSync("./client.html", "utf-8");
+      output = fs.readFileSync("./test-ui.html", "utf-8");
       res.writeHead(200, {"Content-Type":"text/html"});
       break;
   }
@@ -64,8 +64,8 @@ var httpsvr = require('http').createServer(function(req, res) {
 // ===========================
 var WebSocketServer = require('ws').Server;
 var wssvr = new WebSocketServer({
-  host : VSSvrIP,
-  port : VSSvrPort
+  host : VsssIP,
+  port : VsssPort
 });
 
 // =========================================
@@ -449,7 +449,7 @@ wssvr.on('connection', function(ws) {
       // TODO:
       // パケットを分解
       // Authorize Success Response を返送する
-      // VSSvr内にAuthorize状態を持っておく？
+      // Vsss内にAuthorize状態を持っておく？
       // Authorize状態はdataSrc側で持つべきものではない
 
     } else if (obj.action === "getVSS") {
@@ -458,7 +458,7 @@ wssvr.on('connection', function(ws) {
       // 形式はJSONで？
       // VSSは本来は車両が持っている情報
       // とすると、mockDataSrcに問い合わせて取得してもよい気がする
-      // が、単純化のために、VSSvr内で固定のJSONを返すことにする
+      // が、単純化のために、Vsss内で固定のJSONを返すことにする
       // VSSを受けてクライアント側は何に使うのが正しい？
       // 本来は、クライアントは車両からVSSを受け取り、利用可能なデータ項目を知るはず
       // とすると、clientの実装はVSS受信して、それにあった状態になるべき
