@@ -87,7 +87,7 @@
 
       <!-- use VSS data -->
       <br><span id="span_path">data path: </span><select id="sel_path">
-        <option value="">Sample</option>
+        <option value="">----</option>
       </select>
       <br><span class="msg_vss_desc" id="msg_vss_desc1"></span>
       <br><span class="msg_vss_desc" id="msg_vss_desc2"></span>
@@ -110,8 +110,8 @@
 
   <script type="text/javascript">
   var LocalHostIP = "127.0.0.1";
-  var WSSvrIP = "10.5.162.79";
-  var WSSvrPort = "3001";
+  var WSSvrIP = "127.0.0.1";
+  var WSSvrPort = "3000";
 
   var VSS_FILENAME = "vss.json";
 
@@ -267,7 +267,7 @@
   }
 
   function onWsMessage(event) {
-    showInMsgArea("onWsMessage: ");
+    //showInMsgArea("onWsMessage: ");
     showInMsgArea("--: <== " + event.data);
 
     var msg;
@@ -565,7 +565,7 @@
   }
   function selVssOnChange() {
     var path = getSelectedVssPath();
-    if (path=='' || path=='sample') return;
+    if (path=='' || path=='----') return;
     if (g_vssObj == null) return;
 
     var leaf = getLeaf(g_vssObj, path);

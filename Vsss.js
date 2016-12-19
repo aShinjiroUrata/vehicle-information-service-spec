@@ -34,10 +34,12 @@ var dataSrc = EXT_MOCK_SERVER;
 //var dataSrc = EXT_SIP_SERVER;
 
 // == Config this Vehicle Singal Server IP and Port Number here ==
-//var VsssIP = '127.0.0.1';
-var VsssIP = '10.5.162.79';
-var HttpSvrPort = 3000;
-var VsssPort = 3001;
+var VsssIP = '127.0.0.1';
+var HttpSvrPort = 8081;
+var VsssPort = 3000;
+
+var ExtMockSvrIP = '127.0.0.1';
+var ExtMockSvrPort = 3001;
 
 // =========================
 // == Publish test-ui.html ==
@@ -144,7 +146,7 @@ if (dataSrc === LOCAL_MOCK_DATA) {
 
 var g_extMockDataSrc = (function() {
 
-  var m_svrUrl = "ws://127.0.0.1:3002";
+  var m_svrUrl = "ws://"+ExtMockSvrIP+":"+ExtMockSvrPort;
   var m_conn = null;
 
   var obj = {

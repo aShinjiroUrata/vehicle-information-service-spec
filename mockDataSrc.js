@@ -13,8 +13,7 @@
 "use strict"
 
 // == Set Server IP and Port Number here ==
-//var DATASRC_IP = '127.0.0.1';
-var DATASRC_PORT = 3002;
+var DATASRC_PORT = 3001;
 var TIMER_INTERVAL = 1000;
 
 //座席数の定義(vssには、Row5, Pos5などあり、無制限にありうるので)
@@ -56,7 +55,7 @@ var httpSvr = http.createServer(function(request, response) {
   response.end();
 });
 httpSvr.listen(DATASRC_PORT, function() {
-  console.log((new Date()) + ' httpSvr is listening on port 8080');
+  console.log((new Date()) + ' httpSvr is listening on port '+DATASRC_PORT);
 });
 
 var dataSrcSvr = new WebSocketServer({
