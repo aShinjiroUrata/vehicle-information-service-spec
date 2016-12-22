@@ -5,7 +5,7 @@
 // 1.Install packages
 //   $npm install ws socket.io
 // 2.Edit Vsss.js code
-// - edit Vsss's IP address by change VsssIP value.(change port if you like)
+// - edit Vsss's IP address by change VSSS_IP value.(change port if you like)
 // - select data source to connect
 //   - LOCAL_MOCK_DATA : to use hard coded data source driven by timer
 //   - EXT_MOCK_SERVER : to use external websocket mock server 'mockDataSvr.js'
@@ -13,7 +13,7 @@
 //                       developed for SIP hackathon.
 // 3.Start Vehicle Signal Server
 //   $node Vsss.js
-// 4 Open test-ui app by browser via url= http://{VsssIP}:{HttpSvrPort}
+// 4 Open test-ui app by browser via url= http://{VSSS_IP}:{HTTP_SVR_PORT}
 // 5.If EXT_MOCK_SERVER data source is selected, start external mock data source
 //   (*Edit IP, port in mockDataSvr.js to match with Vsss.js)
 //   $node mockDataSrc.js
@@ -34,12 +34,12 @@ var dataSrc = EXT_MOCK_SERVER;
 //var dataSrc = EXT_SIP_SERVER;
 
 // == Config this Vehicle Singal Server IP and Port Number here ==
-var VsssIP = '127.0.0.1';
-var HttpSvrPort = 8081;
-var VsssPort = 3000;
+var VSSS_IP = '10.5.162.79'; // VSSS's host IP
+var HTTP_SVR_PORT = 8081;
+var VSSS_PORT = 3000;
 
-var ExtMockSvrIP = '127.0.0.1';
-var ExtMockSvrPort = 3001;
+var EXT_MOCKSVR_IP = '127.0.0.1';
+var EXT_MOCKSVR_PORT = 3001;
 
 // =========================
 // == Publish test-ui.html ==
@@ -59,15 +59,15 @@ var httpsvr = require('http').createServer(function(req, res) {
       break;
   }
   res.end(output);
-}).listen(HttpSvrPort);
+}).listen(HTTP_SVR_PORT);
 
 // ===========================
 // == Start WebSocketServer ==
 // ===========================
 var WebSocketServer = require('ws').Server;
 var wssvr = new WebSocketServer({
-  host : VsssIP,
-  port : VsssPort
+  host : VSSS_IP,
+  port : VSSS_PORT
 });
 
 // =========================================
@@ -146,7 +146,7 @@ if (dataSrc === LOCAL_MOCK_DATA) {
 
 var g_extMockDataSrc = (function() {
 
-  var m_svrUrl = "ws://"+ExtMockSvrIP+":"+ExtMockSvrPort;
+  var m_svrUrl = "ws://"+EXT_MOCKSVR_IP+":"+EXT_MOCKSVR_PORT;
   var m_conn = null;
 
   var obj = {
