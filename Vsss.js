@@ -303,25 +303,33 @@ if (dataSrc === EXT_SIP_SERVER) {
   }
 }
 
-//TODO: One WebSocket connection should have one IdTable. Currently only one global IdTable.
 
 // =========================
 // == define RequestTable ==
 // =========================
-//TODO: urata
-//  - reqTable は WebSocket接続のセッション毎に別個にする
-//  - new で 作成する方式に変更する
-//  - ws connection 確立時にReqTalbeも作成する
+//TODO:
+// - wsは複数同時接続される
+// - g_ws一つでなく、接続毎に新しい ws ができ、配列などに保存しておく
+// - WebSocket Close時には、対応するwsを削除する
+// - 念のため、接続毎に sessionID を持たせておく
+// - reqTable は WebSocket接続のセッション毎に別個にする
 
+// =============================
+// == session Hash definition ==
+// =============================
+var g_sessionHash = {};
+var g_sessID_count = 0; // no need to be unique string.
+function createNewSessID() {
+  g_sessID_count++;
+  return g_sessID_count;
+}
 
 // ==========================
 // == ReqTable Constructor ==
 // ==========================
 function ReqTable() {
-
   this.requestHash = {};
   this.subIdHash = {};
-
 }
 ReqTable.prototype.addReqToTable = function(reqObj, subId, timerId) {
   var reqId = reqObj.requestId;
@@ -353,7 +361,7 @@ ReqTable.prototype.addReqToTable = function(reqObj, subId, timerId) {
   //this.dispReqIdHash();
 
   return true;
-};
+}
 ReqTable.prototype.delReqByReqId = function(reqId) {
   console.log("delReqByReqId: reqId = " + reqId);
   if (this.requestHash[reqId] == undefined) {
@@ -366,7 +374,7 @@ ReqTable.prototype.delReqByReqId = function(reqId) {
     delete this.subIdHash[subId];
   console.log("  :EntryNum=" + Object.keys(this.requestHash).length);
   return true;
-};
+}
 ReqTable.prototype.clearReqTable = function() {
   console.log("clearReqTable");
 
@@ -413,143 +421,14 @@ ReqTable.prototype.dispReqIdHash = function() {
   }
 }
 
-// まず、new() による初期化をためす => OKの模様なので複数session対応に移行
-//var g_reqTable = new ReqTable();
 
-// 旧定義
-/*
-var g_reqTable = {
-  requestHash: {},
-  subIdHash: {},
-
-  addReqToTable: function(reqObj, subId, timerId) {
-    var reqId = reqObj.requestId;
-    console.log("addReqToTable: reqId="+reqId);
-    if (this.requestHash[reqId] != undefined) {
-      console.log("  :Error: requestId already used. reqId="+reqId);
-      return false;
-    }
-    this.requestHash[reqId] = reqObj;
-
-    //subscribeの場合subIdHashにも登録する
-    if (reqObj.action == "subscribe") {
-      if (subId != undefined && this.subIdHash[subId] == undefined) {
-        console.log("  :action="+reqObj.action+". adding subId="+subId);
-        this.requestHash[reqId].subscriptionId = subId;
-        this.subIdHash[subId] = reqId;
-      } else {
-        console.log("  :action="+reqObj.action+". not adding subId="+subId);
-      }
-      // timerIdは、setIntervalでイベントを発生させるデモ実装の場合。
-      // dataSrcからデータ通知を受ける場合はタイマは使わない
-      if (timerId != undefined) {
-        console.log("  :action="+reqObj.action+". adding timerId="+subId);
-        this.requestHash[reqId].timerId = timerId;
-      }
-    }
-
-    console.log("  :EntryNum=" + Object.keys(this.requestHash).length);
-    //this.dispReqIdHash();
-
-    return true;
-  },
-  delReqByReqId: function(reqId) {
-    //console.log("delReqByReqId: reqId = " + reqId);
-    if (this.requestHash[reqId] == undefined) {
-      //console.log("  :delReqByReqId: entry is not found. reqId = " + reqId);
-      return false;
-    }
-    var subId = this.requestHash[reqId].subscriptionId;
-    delete this.requestHash[reqId];
-    if (subId != undefined)
-      delete this.subIdHash[subId];
-    console.log("  :EntryNum=" + Object.keys(this.requestHash).length);
-    return true;
-  },
-  clearReqTable: function() {
-    console.log("clearReqTable");
-
-    for (var rid in this.requestHash) {
-      var obj = this.requestHash[rid];
-      console.log("  :reqId=" + obj.requestId + " , subId="+obj.subscriptionId+", path="
-                  +obj.path+", timerId="+obj.timerId);
-      var timerId = obj.timerId;
-      clearInterval(timerId);
-    }
-    for (var rid in this.requestHash) {
-      delete this.requestHash[rid];
-    }
-    for (var sid in this.subIdHash) {
-      delete this.subIdHash[sid];
-    }
-  },
-  getReqIdBySubId: function(subId) {
-    var reqId = this.subIdHash[subId];
-    if (reqId == undefined) return null;
-    return reqId;
-  },
-  getSubIdByReqId: function(reqId) {
-    var obj = this.requestHash[reqId];
-    if (obj == undefined) return null;
-    return obj.subscriptionId;
-  },
-  getTimerIdByReqId: function(reqId) {
-    console.log("getTimerIdByReqId: reqId="+reqId);
-    var obj = this.requestHash[reqId];
-    if (obj == undefined) {
-      console.log("  :getTimerIdByReqId: object not found.");
-      return null;
-    }
-    console.log("  :timerId = " + obj.timerId);
-    return obj.timerId;
-  },
-
-  // for debug
-  dispReqIdHash: function() {
-    console.log("dispReqIdHash:");
-    for (var rid in this.requestHash) {
-      var obj = this.requestHash[rid];
-      console.log("  :reqid=" + obj.requestId + " , subid="+obj.subscriptionId
-                  +", path="+obj.path+", timerid="+obj.timerid);
-    }
-  }
-};
-*/ //旧定義ここまで
-
-//TODO:urata
-// - wsは複数同時接続される
-// - g_ws一つでなく、接続毎に新しい ws ができ、配列などに保存しておく
-// - WebSocket Close時には、対応するwsを削除する
-// - 念のため、接続毎に sessionID を持たせておく？
-var g_ws = null;
-var g_sessID_count = 1; //単純に通し番号にしておく
-var g_sessionHash = {};
-
-
-//TODO: g_sessID_count はグローバルでなくせる
-function getNextSessID() {
-  g_sessID_count++;
-  return g_sessID_count;
-}
-
-
-//新定義
 wssvr.on('connection', function(ws) {
 
-  // 新規connection が確立した
-
-  // new sessionID 生成（通し番号でよい）
-  var _sessID = getNextSessID();
-
-  // reqTable 生成
-  // g_reqTable 使用部分は全部書き換えが必要
+  var _sessID = createNewSessID();
   var _reqTable = new ReqTable();
 
-  // sesID, reqTable, ws をsessionHashに格納する
+  // store sessID, reqTable, ws in a global hash
   g_sessionHash[_sessID] = {'ws': ws, 'reqTable': _reqTable};
-
-  //console.log('ws.on:connection');
-  //g_ws = ws;
 
   // for connecting to outside data source
   ws.on('message', function(message) {
@@ -562,14 +441,12 @@ wssvr.on('connection', function(ws) {
       return;
     }
     console.log("ws.on:message: obj= " + message);
-    //console.log("  :action=" + obj.action);
 
-    // 1 mssage には 1 method しか含まれない前提
+    // NOTE: assuming 1 message contains only 1 method.
     // for 'get'
     if (obj.action === "get") {
       var reqId = obj.requestId;
       var path = obj.path;
-      //var ret = g_reqTable.addReqToTable(obj, null, null);
       var ret = _reqTable.addReqToTable(obj, null, null);
       if (ret == false) {
         console.log("  :Failed to add 'get' info to requestTable.");
@@ -581,10 +458,9 @@ wssvr.on('connection', function(ws) {
       var reqId = obj.requestId;
       var path = obj.path;
       var value = obj.value;
-      //var ret = g_reqTable.addReqToTable(obj, null, null);
       var ret = _reqTable.addReqToTable(obj, null, null);
 
-      // TODO:urata セッション情報の送付も必要、たぶん
+      // TODO: セッション情報の送付も必要
       // 次に dataSrcにset要求を送る。
       // dataSrc==extMockDataSrcの場合は送るが、それ以外は送らない？
       // とりあえずはextMockDataSrcの場合だけ考える
@@ -618,7 +494,6 @@ wssvr.on('connection', function(ws) {
       var action = obj.action;
       var subId = getUniqueSubId();
 
-      //var ret = g_reqTable.addReqToTable(obj, subId, null);
       var ret = _reqTable.addReqToTable(obj, subId, null);
       var timestamp = new Date().getTime().toString(10);
       if (ret == false) {
@@ -629,16 +504,13 @@ wssvr.on('connection', function(ws) {
         console.log("  :subscribe started. reqId=" + reqId + ", subId=" + subId + ", path=" + path);
         resObj = createSubscribeSuccessResponseJson(action, reqId, subId, timestamp);
       }
-      // TODO: ここはthis とかの方がよい？
       ws.send(JSON.stringify(resObj));
 
     } else if (obj.action === "unsubscribe") {
       var reqId = obj.requestId; // unsub requestのreqId
       var targ_subId = obj.subscriptionId; // subscribe のsubId
-      //var targ_reqId = g_reqTable.getReqIdBySubId(targ_subId); // subscribeのreqId
       var targ_reqId = _reqTable.getReqIdBySubId(targ_subId); // subscribeのreqId
       var resObj;
-      //var ret = g_reqTable.delReqByReqId(targ_reqId); // subscribeのentryを削除
       var ret = _reqTable.delReqByReqId(targ_reqId); // subscribeのentryを削除
       var timestamp = new Date().getTime().toString(10);
       if (ret == true) {
@@ -657,137 +529,17 @@ wssvr.on('connection', function(ws) {
 
   ws.on('close', function() {
     console.log('ws.on:closed');
-    //g_reqTable.clearReqTable();
     _reqTable.clearReqTable();
 
-    // TODO: session全体を消すこと
+    // delete a session
     var sess = g_sessionHash[_sessID];
     sess.ws = null;
     delete sess.reqTable;
     delete g_sessionHash[_sessID];
-
-  });
-
-
-});
-
-
-
-
-/*
-// 旧定義
-wssvr.on('connection', function(ws) {
-  //console.log('ws.on:connection');
-  g_ws = ws;
-
-  // for connecting to outside data source
-  g_ws.on('message', function(message) {
-    var obj;
-    try {
-      obj = JSON.parse(message);
-    } catch (e) {
-      console.log("  :received irregular Json messaged. ignored.");
-      console.log("  :Error = "+e);
-      return;
-    }
-    console.log("ws.on:message: obj= " + message);
-    //console.log("  :action=" + obj.action);
-
-    // for 'get'
-    if (obj.action === "get") {
-      var reqId = obj.requestId;
-      var path = obj.path;
-      var ret = g_reqTable.addReqToTable(obj, null, null);
-      if (ret == false) {
-        console.log("  :Failed to add 'get' info to requestTable.");
-      }
-      console.log("  :get request registered. reqId=" + reqId + ", path=" + path);
-
-    } else if (obj.action === "set") {
-      //console.log("  :action=" + obj.action);
-      var reqId = obj.requestId;
-      var path = obj.path;
-      var value = obj.value;
-      var ret = g_reqTable.addReqToTable(obj, null, null);
-
-      // TODO:
-      // 次に dataSrcにset要求を送る。
-      // dataSrc==extMockDataSrcの場合は送るが、それ以外は送らない？
-      // とりあえずはextMockDataSrcの場合だけ考える
-      g_extMockDataSrc.sendSetRequest(obj);
-
-    } else if (obj.action === "authorize") {
-      // TODO:
-      // パケットを分解
-      // Authorize Success Response を返送する
-      // Vsss内にAuthorize状態を持っておく？
-      // Authorize状態はdataSrc側で持つべきものではない
-
-    } else if (obj.action === "getVSS") {
-      // TODO:
-      // 機械的にVSSを送り返せばよい？
-      // 形式はJSONで？
-      // VSSは本来は車両が持っている情報
-      // とすると、mockDataSrcに問い合わせて取得してもよい気がする
-      // が、単純化のために、Vsss内で固定のJSONを返すことにする
-      // VSSを受けてクライアント側は何に使うのが正しい？
-      // 本来は、クライアントは車両からVSSを受け取り、利用可能なデータ項目を知るはず
-      // とすると、clientの実装はVSS受信して、それにあった状態になるべき
-      // が、それは先の課題としておく_
-
-    // for 'subscribe'
-    } else if (obj.action === "subscribe") {
-
-      var resObj = null;
-      var reqId = obj.requestId;
-      var path = obj.path;
-      var action = obj.action;
-      var subId = getUniqueSubId();
-
-      var ret = g_reqTable.addReqToTable(obj, subId, null);
-      var timestamp = new Date().getTime().toString(10);
-      if (ret == false) {
-        console.log("  :Failed to add subscribe info to IdTable. Cancel the timer.");
-        var error = -1; //TODO: select correct error code
-        resObj = createSubscribeErrorResponseJson(action, reqId, path, error, timestamp);
-      } else {
-        console.log("  :subscribe started. reqId=" + reqId + ", subId=" + subId + ", path=" + path);
-        resObj = createSubscribeSuccessResponseJson(action, reqId, subId, timestamp);
-      }
-      g_ws.send(JSON.stringify(resObj));
-
-    } else if (obj.action === "unsubscribe") {
-      var reqId = obj.requestId; // unsub requestのreqId
-      var targ_subId = obj.subscriptionId; // subscribe のsubId
-      var targ_reqId = g_reqTable.getReqIdBySubId(targ_subId); // subscribeのreqId
-      var resObj;
-      var ret = g_reqTable.delReqByReqId(targ_reqId); // subscribeのentryを削除
-      var timestamp = new Date().getTime().toString(10);
-      if (ret == true) {
-        resObj = createUnsubscribeSuccessResponseJson(obj.action, reqId, targ_subId, timestamp);
-      } else {
-        var err = -1; //TODO: select correct error value
-        resObj = createUnsubscribeErrorResponseJson(obj.action, reqId, targ_subId, err, timestamp);
-      }
-      g_ws.send(JSON.stringify(resObj));
-
-    } else {
-      //Do nothing
-    }
-  });
-
-  g_ws.on('close', function() {
-    console.log('ws.on:closed');
-    g_reqTable.clearReqTable();
-    g_ws = null;
   });
 });
-*/
 
-
-
-// 新実装
-// dataSrcから受信したデータを処理する
+// Handle data received from data source
 function dataReceiveHandler(message) {
   //console.log("dataReceiveHandler: ");
   //console.log("  :message=" + message);
@@ -811,7 +563,6 @@ function dataReceiveHandler(message) {
     // handler for 'set' response
     console.log("  :set message=" + JSON.stringify(setObj));
 
-    // TODO: g_reqTable 使用箇所は対応が必要
     for (var j in g_sessionHash) {
       var _sess = g_sessionHash[j];
       var _reqTable = _sess.reqTable;
@@ -827,7 +578,7 @@ function dataReceiveHandler(message) {
         retObj = null;
         //console.log("  :reqObj="+JSON.stringify(reqObj));
 
-        //TODO:urata ■  ■  ■  ■  ■  ■  
+        //TODO:
         // setのresponseと、setの実行元のreqObj をマッチングしている
 　　　  // action=setでpathが合致している、という判断基準
         // これは不十分。複数sessionで同じdata pathにsetがされた場合など
@@ -840,41 +591,30 @@ function dataReceiveHandler(message) {
           } else {
             retObj = createSetSuccessResponseJson(reqObj.requestId, setObj.timestamp);
           }
-          if (g_ws != null)
-            g_ws.send(JSON.stringify(retObj));
+          if (_ws != null)
+            _ws.send(JSON.stringify(retObj));
           // delete this request from queue
           _reqTable.delReqByReqId(reqObj.requestId);
         }
       }
     }
 
-
   // 通常のpush データへの対応
+  // handler for 'data' notification from data source
+  // handle 'get' and 'subscribe' at here
   } else if (dataObj != undefined) {
-    // handler for 'data' notification from data source
-    // handle 'get' and 'subscribe' at here
-
-    //console.log("  :data message=" + JSON.stringify(dataObj));
-    //TODO:urata
-    // - 複数session の全requestについてループが必要
     for (var j in g_sessionHash) {
-      var _sess = g_sessionHash[j];
-      console.log("dataRecieveHanlder:j= "+j+", _sess= "+_sess);
-      var _reqTable = _sess.reqTable;
-      var _ws = _sess.ws;
-      console.log("_reqTable.requestHash = " + JSON.stringify(_reqTable.requestHash));
-      //for (var i in g_reqTable.requestHash) {
+      var _sessObj = g_sessionHash[j];
+      var _reqTable = _sessObj.reqTable;
+      var _ws = _sessObj.ws;
       for (var i in _reqTable.requestHash) {
-        //reqObj = g_reqTable.requestHash[i];
         reqObj = _reqTable.requestHash[i];
-        console.log("  :reqObj=" + JSON.stringify(reqObj));
         if (reqObj.action != 'get' && reqObj.action != 'subscribe') {
           console.log("  :skip data: action="+ reqObj.action);
           continue;
         }
         matchObj = null;
         retObj = null;
-        //console.log("  :reqObj="+JSON.stringify(reqObj));
 
         // do matching between received data path and client's request.
         // TODO: find faster efficient mathcing method.
@@ -885,21 +625,16 @@ function dataReceiveHandler(message) {
           if (reqObj.action === "get") {
             // send back 'getSuccessResponse'
             retObj = createGetSuccessResponseJson(reqObj.requestId, matchObj.value, matchObj.timestamp);
-            //if (g_ws != null)
             if (_ws != null)
-              //g_ws.send(JSON.stringify(retObj));
               _ws.send(JSON.stringify(retObj));
             // delete this request from queue
-            //g_reqTable.delReqByReqId(reqObj.requestId);
             _reqTable.delReqByReqId(reqObj.requestId);
 
           } else if (reqObj.action === "subscribe") {
             // send back 'subscribeSuccessResponse'
             retObj = createSubscribeNotificationJson(reqObj.requestId, reqObj.subscriptionId,
                         reqObj.action, reqObj.path, matchObj.value, matchObj.timestamp);
-            //if (g_ws != null)
             if (_ws != null)
-              //g_ws.send(JSON.stringify(retObj));
               _ws.send(JSON.stringify(retObj));
           //} else if (reqObj.action === "set") {
           //} else if (reqObj.action === "authorize") {
@@ -909,115 +644,9 @@ function dataReceiveHandler(message) {
           }
         }
       }
-
-
-    }
-
-
-  }
-}
-
-
-
-
-
-
-//旧実装
-/*
-// dataSrcから受信したデータを処理する
-function dataReceiveHandler(message) {
-  //console.log("dataReceiveHandler: ");
-  //console.log("  :message=" + message);
-  var obj;
-  try {
-    obj = JSON.parse(message);
-  } catch(e) {
-    //irregurlar Json case
-    console.log("  :received irregular Json messaged. ignored.");
-    console.log("  :Error = "+e);
-    return;
-  }
-  var dataObj = obj.data;
-  var setObj = obj.set;
-
-  var matchObj;
-  var retObj, reqObj;
-
-  if (setObj != undefined) {
-    // handler for 'set' response
-    console.log("  :set message=" + JSON.stringify(setObj));
-
-    // TODO: g_reqTable 使用箇所は対応が必要
-    for (var i in g_reqTable.requestHash) {
-      reqObj = g_reqTable.requestHash[i];
-      if (reqObj.action != 'set') {
-        console.log("  :skip data: action="+ reqObj.action);
-        continue;
-      }
-      matchObj = null;
-      retObj = null;
-      //console.log("  :reqObj="+JSON.stringify(reqObj));
-
-      if ((matchObj = matchPathforSet(reqObj, setObj)) != undefined) {
-        if (setObj.error != undefined) {
-          retObj = createSetErrorResponseJson(reqObj.requestId, setObj.error, setObj.timestamp);
-        } else {
-          retObj = createSetSuccessResponseJson(reqObj.requestId, setObj.timestamp);
-        }
-        if (g_ws != null)
-          g_ws.send(JSON.stringify(retObj));
-        // delete this request from queue
-        g_reqTable.delReqByReqId(reqObj.requestId);
-      }
-    }
-  } else if (dataObj != undefined) {
-    // handler for 'data' notification from data source
-    // handle 'get' and 'subscribe' at here
-
-    //console.log("  :data message=" + JSON.stringify(dataObj));
-    //TODO:urata
-    // - 複数session の全requestについてループが必要
-    for (var i in g_reqTable.requestHash) {
-      reqObj = g_reqTable.requestHash[i];
-      if (reqObj.action != 'get' && reqObj.action != 'subscribe') {
-        console.log("  :skip data: action="+ reqObj.action);
-        continue;
-      }
-      matchObj = null;
-      retObj = null;
-      //console.log("  :reqObj="+JSON.stringify(reqObj));
-
-      // do matching between received data path and client's request.
-      // TODO: find faster efficient mathcing method.
-      //       for now, treat path just as simple string.
-      //       there should be better way to handle VSS tree structure.
-      //       use hash or index or something.
-      if ((matchObj = matchPath(reqObj, dataObj)) != undefined) {
-        if (reqObj.action === "get") {
-          // send back 'getSuccessResponse'
-          retObj = createGetSuccessResponseJson(reqObj.requestId, matchObj.value, matchObj.timestamp);
-          if (g_ws != null)
-            g_ws.send(JSON.stringify(retObj));
-          // delete this request from queue
-          g_reqTable.delReqByReqId(reqObj.requestId);
-
-        } else if (reqObj.action === "subscribe") {
-          // send back 'subscribeSuccessResponse'
-          retObj = createSubscribeNotificationJson(reqObj.requestId, reqObj.subscriptionId,
-                      reqObj.action, reqObj.path, matchObj.value, matchObj.timestamp);
-          if (g_ws != null)
-            g_ws.send(JSON.stringify(retObj));
-        //} else if (reqObj.action === "set") {
-        //} else if (reqObj.action === "authorize") {
-        //} else if (reqObj.action === "getVSS") {
-        } else {
-          // nothing to do
-        }
-      }
     }
   }
 }
-*/
 
 function matchPath(reqObj, dataObj) {
   //TODO: find more efficient matching method
@@ -1030,7 +659,7 @@ function matchPath(reqObj, dataObj) {
   return undefined;
 }
 
-//TODO:urata  pathだけのマッチングでは不十分
+//TODO:  pathだけのマッチングでは不十分
 // reqId, sessIdでのマッチングはできない？
 // sessIDも送るならmockDataSrc側の対応も必要
 function matchPathforSet(reqObj, dataObj) {
