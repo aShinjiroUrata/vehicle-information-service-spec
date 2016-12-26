@@ -413,8 +413,8 @@ ReqTable.prototype.dispReqIdHash = function() {
   }
 }
 
-// まず、new() による初期化をためす
-var g_reqTable = new ReqTable();
+// まず、new() による初期化をためす => OKの模様なので複数session対応に移行
+//var g_reqTable = new ReqTable();
 
 // 旧定義
 /*
@@ -533,6 +533,7 @@ function getNextSessID() {
 }
 
 
+//新定義
 wssvr.on('connection', function(ws) {
 
   // 新規connection が確立した
@@ -563,6 +564,7 @@ wssvr.on('connection', function(ws) {
     console.log("ws.on:message: obj= " + message);
     //console.log("  :action=" + obj.action);
 
+    // 1 mssage には 1 method しか含まれない前提
     // for 'get'
     if (obj.action === "get") {
       var reqId = obj.requestId;
@@ -582,7 +584,7 @@ wssvr.on('connection', function(ws) {
       //var ret = g_reqTable.addReqToTable(obj, null, null);
       var ret = _reqTable.addReqToTable(obj, null, null);
 
-      // TODO:
+      // TODO:urata セッション情報の送付も必要、たぶん
       // 次に dataSrcにset要求を送る。
       // dataSrc==extMockDataSrcの場合は送るが、それ以外は送らない？
       // とりあえずはextMockDataSrcの場合だけ考える
@@ -672,10 +674,8 @@ wssvr.on('connection', function(ws) {
 
 
 
-
-
-// 旧定義
 /*
+// 旧定義
 wssvr.on('connection', function(ws) {
   //console.log('ws.on:connection');
   g_ws = ws;
@@ -786,8 +786,7 @@ wssvr.on('connection', function(ws) {
 
 
 
-
-
+// 新実装
 // dataSrcから受信したデータを処理する
 function dataReceiveHandler(message) {
   //console.log("dataReceiveHandler: ");
@@ -814,8 +813,9 @@ function dataReceiveHandler(message) {
 
     // TODO: g_reqTable 使用箇所は対応が必要
     for (var j in g_sessionHash) {
-      var _sess = g_sessionHash[i];
+      var _sess = g_sessionHash[j];
       var _reqTable = _sess.reqTable;
+      var _ws = _sess.ws;
 
       for (var i in _reqTable.requestHash) {
         reqObj = _reqTable.requestHash[i];
@@ -849,8 +849,6 @@ function dataReceiveHandler(message) {
     }
 
 
-
-
   // 通常のpush データへの対応
   } else if (dataObj != undefined) {
     // handler for 'data' notification from data source
@@ -859,46 +857,63 @@ function dataReceiveHandler(message) {
     //console.log("  :data message=" + JSON.stringify(dataObj));
     //TODO:urata
     // - 複数session の全requestについてループが必要
-    for (var i in g_reqTable.requestHash) {
-      reqObj = g_reqTable.requestHash[i];
-      if (reqObj.action != 'get' && reqObj.action != 'subscribe') {
-        console.log("  :skip data: action="+ reqObj.action);
-        continue;
-      }
-      matchObj = null;
-      retObj = null;
-      //console.log("  :reqObj="+JSON.stringify(reqObj));
+    for (var j in g_sessionHash) {
+      var _sess = g_sessionHash[j];
+      console.log("dataRecieveHanlder:j= "+j+", _sess= "+_sess);
+      var _reqTable = _sess.reqTable;
+      var _ws = _sess.ws;
+      console.log("_reqTable.requestHash = " + JSON.stringify(_reqTable.requestHash));
+      //for (var i in g_reqTable.requestHash) {
+      for (var i in _reqTable.requestHash) {
+        //reqObj = g_reqTable.requestHash[i];
+        reqObj = _reqTable.requestHash[i];
+        console.log("  :reqObj=" + JSON.stringify(reqObj));
+        if (reqObj.action != 'get' && reqObj.action != 'subscribe') {
+          console.log("  :skip data: action="+ reqObj.action);
+          continue;
+        }
+        matchObj = null;
+        retObj = null;
+        //console.log("  :reqObj="+JSON.stringify(reqObj));
 
-      // do matching between received data path and client's request.
-      // TODO: find faster efficient mathcing method.
-      //       for now, treat path just as simple string.
-      //       there should be better way to handle VSS tree structure.
-      //       use hash or index or something.
-      if ((matchObj = matchPath(reqObj, dataObj)) != undefined) {
-        if (reqObj.action === "get") {
-          // send back 'getSuccessResponse'
-          retObj = createGetSuccessResponseJson(reqObj.requestId, matchObj.value, matchObj.timestamp);
-          if (g_ws != null)
-            g_ws.send(JSON.stringify(retObj));
-          // delete this request from queue
-          g_reqTable.delReqByReqId(reqObj.requestId);
+        // do matching between received data path and client's request.
+        // TODO: find faster efficient mathcing method.
+        //       for now, treat path just as simple string.
+        //       there should be better way to handle VSS tree structure.
+        //       use hash or index or something.
+        if ((matchObj = matchPath(reqObj, dataObj)) != undefined) {
+          if (reqObj.action === "get") {
+            // send back 'getSuccessResponse'
+            retObj = createGetSuccessResponseJson(reqObj.requestId, matchObj.value, matchObj.timestamp);
+            //if (g_ws != null)
+            if (_ws != null)
+              //g_ws.send(JSON.stringify(retObj));
+              _ws.send(JSON.stringify(retObj));
+            // delete this request from queue
+            //g_reqTable.delReqByReqId(reqObj.requestId);
+            _reqTable.delReqByReqId(reqObj.requestId);
 
-        } else if (reqObj.action === "subscribe") {
-          // send back 'subscribeSuccessResponse'
-          retObj = createSubscribeNotificationJson(reqObj.requestId, reqObj.subscriptionId,
-                      reqObj.action, reqObj.path, matchObj.value, matchObj.timestamp);
-          if (g_ws != null)
-            g_ws.send(JSON.stringify(retObj));
-        /*
-        } else if (reqObj.action === "set") {
-        } else if (reqObj.action === "authorize") {
-        } else if (reqObj.action === "getVSS") {
-        */
-        } else {
-          // nothing to do
+          } else if (reqObj.action === "subscribe") {
+            // send back 'subscribeSuccessResponse'
+            retObj = createSubscribeNotificationJson(reqObj.requestId, reqObj.subscriptionId,
+                        reqObj.action, reqObj.path, matchObj.value, matchObj.timestamp);
+            //if (g_ws != null)
+            if (_ws != null)
+              //g_ws.send(JSON.stringify(retObj));
+              _ws.send(JSON.stringify(retObj));
+          //} else if (reqObj.action === "set") {
+          //} else if (reqObj.action === "authorize") {
+          //} else if (reqObj.action === "getVSS") {
+          } else {
+            // nothing to do
+          }
         }
       }
+
+
     }
+
+
   }
 }
 
@@ -992,11 +1007,9 @@ function dataReceiveHandler(message) {
                       reqObj.action, reqObj.path, matchObj.value, matchObj.timestamp);
           if (g_ws != null)
             g_ws.send(JSON.stringify(retObj));
-        /*
-        } else if (reqObj.action === "set") {
-        } else if (reqObj.action === "authorize") {
-        } else if (reqObj.action === "getVSS") {
-        */
+        //} else if (reqObj.action === "set") {
+        //} else if (reqObj.action === "authorize") {
+        //} else if (reqObj.action === "getVSS") {
         } else {
           // nothing to do
         }
