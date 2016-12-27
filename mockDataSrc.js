@@ -17,7 +17,7 @@ var DATASRC_PORT = 3001;
 var TIMER_INTERVAL = 1000;
 
 //座席数の定義(vssには、Row5, Pos5などあり、無制限にありうるので)
-//TODO: 必要以上の座席は使用しない
+//TODO: 必要以上の座席は使用しないようにしたい
 var ROW_NUM = 1;
 var POS_NUM = 2
 
@@ -71,19 +71,18 @@ dataSrcSvr.on('request', function(request) {
   var timerId = setInterval(function() {
     updateDataObj(g_dataObj, g_updateList);
     var msg = generatePushJson(g_dataObj);
-    dbgDispLeafValue(g_dataObj, "Signal.Drivetrain.Transmission.Speed");
-    dbgDispLeafValue(g_dataObj, "Signal.Chassis.SteeringWheel.Angle");
+    //dbgDispLeafValue(g_dataObj, "Signal.Drivetrain.Transmission.Speed");
+    //dbgDispLeafValue(g_dataObj, "Signal.Chassis.SteeringWheel.Angle");
 
     //send out via websocket
     conn.sendUTF(JSON.stringify(msg));
   }, TIMER_INTERVAL);
 
-  //原則としてdataSrcはデータを流すのみでclientからの入力は
-  //無視する
+  // 原則としてdataSrcはデータを流すのみでclientからの入力は受け付けない
+  // setのrequestのみ例外
   conn.on('message', function(msg) {
     if (msg.type === 'utf8') {
       //console.log('  :ws.on:message = '+ msg.utf8Data);
-      // action==setなら、対応する値を保存する
       var reqObj;
       try {
         reqObj = JSON.parse(msg.utf8Data);
@@ -92,12 +91,11 @@ dataSrcSvr.on('request', function(request) {
         return;
       }
       if (reqObj.action === 'set') {
-        //console.log('  :reqObj.path = '+ reqObj.path);
-        //console.log('  :reqObj.value = '+ reqObj.value);
+        //console.log('  :reqObj = '+ JSON.stringify(reqObj));
         var result = saveSetData(reqObj.path, reqObj.value);
-        //console.log("  :result ="+result);
-        var retObj = createSetResponse(result, reqObj.path, reqObj.value);
-        //パケット返信
+        var retObj = createSetResponse(result, reqObj.path, reqObj.value,
+                                        reqObj.setRequestId);
+        //console.log('  :retObj = '+ JSON.stringify(retObj));
         conn.sendUTF(JSON.stringify(retObj));
       }
     }
@@ -111,8 +109,8 @@ dataSrcSvr.on('request', function(request) {
 });
 
 /*
- - dataObj は vssからchildrenを除いた方がよいか？
- - または、vssをできるだけ変更しないで使う方がよいか？ まずこちらで！
+ - dataObj は手間を減らすため vssのJSON構造そのままを使用する
+ - 必要な部分のみ値追加、変更する方針
  - 各leaf の初期値はどうする？ => 型だけ合わせた適当な値を使う
  - 各leaf の値の更新はどうする？=> リストアップされた値のみ更新する
 */
@@ -251,15 +249,17 @@ function saveSetData(_path, _value) {
   return ERR_OK;
 }
 
-function createSetResponse(result, path, value) {
+function createSetResponse(result, path, value, setReqId) {
   var dataObj;
   var timestamp = new Date().getTime().toString(10);
 
   if (result == ERR_OK) {
-    dataObj = {'action':'set', 'path':path, 'value':value, 'timestamp':timestamp};
+    dataObj = {'action':'set', 'path':path, 'value':value,
+               'setRequestId':setReqId, 'timestamp':timestamp};
   } else {
     var err = getErrorObj(result);
-    dataObj = {'action':'set', 'path':path, 'error':err, 'timestamp':timestamp};
+    dataObj = {'action':'set', 'path':path, 'error':err,
+               'setRequestId':setReqId, 'timestamp':timestamp};
   }
   var obj = {"set": dataObj};
   return obj;

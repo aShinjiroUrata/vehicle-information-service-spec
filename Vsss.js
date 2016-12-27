@@ -149,6 +149,8 @@ var g_extMockDataSrc = (function() {
   var m_svrUrl = "ws://"+EXT_MOCKSVR_IP+":"+EXT_MOCKSVR_PORT;
   var m_conn = null;
 
+  var setReqHash = {}; //{setReqId : {'requestId':reqId, 'sessionId':sessId}}
+
   var obj = {
     svrUrl: m_svrUrl,
 
@@ -172,13 +174,39 @@ var g_extMockDataSrc = (function() {
     },
 
     //send set request to mockDataSrc
-    sendSetRequest: function(obj) {
+    sendSetRequest: function(obj, _reqId, _sessId) {
       if (m_conn != null) {
-        console.log("sendSetRequest: ");
-        console.log("  :obj="+JSON.stringify(obj));
-        m_conn.sendUTF(JSON.stringify(obj));
+        //console.log("sendSetRequest: ");
+        var setReqId = this.createSetReqId();
+        var sendObj = this.createExtMockSvrSetRequestJson(obj, setReqId);
+        this.addSetReqHash(setReqId, _reqId, _sessId);
+        //console.log("  :sendObj="+JSON.stringify(sendObj));
+        m_conn.sendUTF(JSON.stringify(sendObj));
       }
+    },
+
+    createSetReqId: function() {
+      var uniq = getSemiUniqueId();
+      return "setreqid-"+uniq;
+    },
+
+    //function createExtMockSvrSetRequestJson(_obj, _reqId, _sessId) {
+    createExtMockSvrSetRequestJson: function(_obj, _setReqId) {
+      //console.log("createExtMockSvrSetRequestJson");
+      var retObj = {"action": "set", "path": _obj.path, "value": _obj.value,
+                    "setRequestId":_setReqId};
+      return retObj;
+    },
+    addSetReqHash: function(_setReqId, _reqId, _sessId) {
+      setReqHash[_setReqId] = {'requestId':_reqId, 'sessionId':_sessId};
+    },
+    delSetReqHash: function(_setReqId) {
+      delete setReqHash[_setReqId];
+    },
+    getReqIdSessIdObj: function(_setReqId) {
+      return setReqHash[_setReqId];
     }
+
   }
   return obj;
 })();
@@ -421,14 +449,13 @@ ReqTable.prototype.dispReqIdHash = function() {
   }
 }
 
-
 wssvr.on('connection', function(ws) {
 
-  var _sessID = createNewSessID();
+  var _sessId = createNewSessID();
   var _reqTable = new ReqTable();
 
   // store sessID, reqTable, ws in a global hash
-  g_sessionHash[_sessID] = {'ws': ws, 'reqTable': _reqTable};
+  g_sessionHash[_sessId] = {'ws': ws, 'reqTable': _reqTable};
 
   // for connecting to outside data source
   ws.on('message', function(message) {
@@ -460,11 +487,8 @@ wssvr.on('connection', function(ws) {
       var value = obj.value;
       var ret = _reqTable.addReqToTable(obj, null, null);
 
-      // TODO: セッション情報の送付も必要
-      // 次に dataSrcにset要求を送る。
-      // dataSrc==extMockDataSrcの場合は送るが、それ以外は送らない？
       // とりあえずはextMockDataSrcの場合だけ考える
-      g_extMockDataSrc.sendSetRequest(obj);
+      g_extMockDataSrc.sendSetRequest(obj, reqId, _sessId);
 
     } else if (obj.action === "authorize") {
       // TODO:
@@ -532,10 +556,10 @@ wssvr.on('connection', function(ws) {
     _reqTable.clearReqTable();
 
     // delete a session
-    var sess = g_sessionHash[_sessID];
+    var sess = g_sessionHash[_sessId];
     sess.ws = null;
     delete sess.reqTable;
-    delete g_sessionHash[_sessID];
+    delete g_sessionHash[_sessId];
   });
 });
 
@@ -558,46 +582,45 @@ function dataReceiveHandler(message) {
   var matchObj;
   var retObj, reqObj;
 
-  // setのresponseが来た場合
+　// setのresponseが来た場合
   if (setObj != undefined) {
     // handler for 'set' response
+    // (#setObj contains only one set response)
     console.log("  :set message=" + JSON.stringify(setObj));
 
-    for (var j in g_sessionHash) {
-      var _sess = g_sessionHash[j];
-      var _reqTable = _sess.reqTable;
-      var _ws = _sess.ws;
+    do { // for exitting by 'break'
+      var _setReqId = setObj.setRequestId;
+      var _reqIdsessIdObj = g_extMockDataSrc.getReqIdSessIdObj(_setReqId);
+      console.log("  :reqIdsessIdObj=" + JSON.stringify(_reqIdsessIdObj));
+      if (_reqIdsessIdObj == undefined) break;
+      var _sessId = _reqIdsessIdObj.sessionId;
+      var _reqId = _reqIdsessIdObj.requestId;
+      // As set response is returned, delete from hash.
+      g_extMockDataSrc.delSetReqHash[_setReqId];
 
-      for (var i in _reqTable.requestHash) {
-        reqObj = _reqTable.requestHash[i];
-        if (reqObj.action != 'set') {
-          console.log("  :skip data: action="+ reqObj.action);
-          continue;
-        }
-        matchObj = null;
-        retObj = null;
-        //console.log("  :reqObj="+JSON.stringify(reqObj));
+      if (_sessId == undefined ||_reqId == undefined) break;
 
-        //TODO:
-        // setのresponseと、setの実行元のreqObj をマッチングしている
-　　　  // action=setでpathが合致している、という判断基準
-        // これは不十分。複数sessionで同じdata pathにsetがされた場合など
-        // データが混合する
-        // dataSrcにset request を投げるときに、sessId, reqIdまで含めると
-        // 確実にマッチングができるが。。
-        if ((matchObj = matchPathforSet(reqObj, setObj)) != undefined) {
-          if (setObj.error != undefined) {
-            retObj = createSetErrorResponseJson(reqObj.requestId, setObj.error, setObj.timestamp);
-          } else {
-            retObj = createSetSuccessResponseJson(reqObj.requestId, setObj.timestamp);
-          }
-          if (_ws != null)
-            _ws.send(JSON.stringify(retObj));
-          // delete this request from queue
-          _reqTable.delReqByReqId(reqObj.requestId);
-        }
+      var _sessObj = g_sessionHash[_sessId];
+      if (_sessObj == undefined) break;
+      var _reqTable = _sessObj.reqTable;
+      var _ws = _sessObj.ws;
+      var _reqObj = _reqTable.requestHash[_reqId];
+      if (_reqObj == undefined) break;
+
+      if (setObj.error != undefined) {
+        retObj = createSetErrorResponseJson(_reqObj.requestId, setObj.error, setObj.timestamp);
+      } else {
+        retObj = createSetSuccessResponseJson(_reqObj.requestId, setObj.timestamp);
       }
-    }
+      console.log("  :set response="+JSON.stringify(retObj));
+      if (_ws != null) {
+        console.log("  :_ws.send "+JSON.stringify(retObj));
+        _ws.send(JSON.stringify(retObj));
+      }
+      // delete this request from queue
+      _reqTable.delReqByReqId(_reqObj.requestId);
+
+    } while(false);
 
   // 通常のpush データへの対応
   // handler for 'data' notification from data source
@@ -659,17 +682,6 @@ function matchPath(reqObj, dataObj) {
   return undefined;
 }
 
-//TODO:  pathだけのマッチングでは不十分
-// reqId, sessIdでのマッチングはできない？
-// sessIDも送るならmockDataSrc側の対応も必要
-function matchPathforSet(reqObj, dataObj) {
-  if (reqObj.path === dataObj.path) {
-    return dataObj;
-  } else {
-    return undefined;
-  }
-}
-
 // ===================
 // == Utility funcs ==
 // ===================
@@ -680,11 +692,19 @@ function dispObject(obj) {
     console.log("  :==> " + n + " : " + obj[n] );
   }
 }
-function getUniqueSubId() {
+function getSemiUniqueId() {
   // create semi-uniquID (for implementation easyness) as timestamp(milli sec)+random string
   // uniqueness is not 100% guaranteed.
   var strength = 1000;
   var uniq = new Date().getTime().toString(16) + Math.floor(strength*Math.random()).toString(16);
+  return uniq;
+}
+
+function getUniqueSubId() {
+  // create semi-uniquID (for implementation easyness) as timestamp(milli sec)+random string
+  // uniqueness is not 100% guaranteed.
+  var strength = 1000;
+  var uniq = getSemiUniqueId();
   return "subid-"+uniq;
 }
 
@@ -725,12 +745,12 @@ function createUnsubscribeErrorResponseJson(action, reqId, subId, error, timesta
 }
 
 function createSetSuccessResponseJson(reqId, timestamp) {
-  console.log("createSetSuccessResponseJson");
+  //console.log("createSetSuccessResponseJson");
   var retObj = {"action": "set", "requestId":reqId, "timestamp":timestamp};
   return retObj;
 }
 function createSetErrorResponseJson(reqId, error, timestamp) {
-  console.log("createSetErrorResponseJson");
+  //console.log("createSetErrorResponseJson");
   var retObj = {"action": "set", "requestId":reqId, "error":error, "timestamp":timestamp};
   return retObj;
 }
