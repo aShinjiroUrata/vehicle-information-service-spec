@@ -41,6 +41,15 @@ var VSSS_PORT = 3000;
 var EXT_MOCKSVR_IP = '127.0.0.1';
 var EXT_MOCKSVR_PORT = 3001;
 
+// == Error value definition ==
+var ERR_SUCCESS = 'success';
+var ERR_INVALID_TOKEN = 'invalid token';
+
+// == static values ==
+// TODO: TTLは有効な期間(1000secなど)？ or Expireする時刻(Unix epochなど)？
+// 時刻の方が使いやすいか？期間だと開始時刻が必要になるので。
+var AUTHORIZE_TTL = 1000000; //sec? とりあえずなにか値を設定しておくだけ
+
 // =========================
 // == Publish test-ui.html ==
 // =========================
@@ -514,11 +523,19 @@ wssvr.on('connection', function(ws) {
       g_extMockDataSrc.sendSetRequest(obj, reqId, _sessId);
 
     } else if (obj.action === "authorize") {
-      // TODO:
-      // パケットを分解
-      // Authorize Success Response を返送する
-      // Vsss内にAuthorize状態を持っておく？
-      // Authorize状態はdataSrc側で持つべきものではない
+      var reqId = obj.requestId;
+      var token = obj.tokens;
+
+      var err = judgeAuthorizeToken(token);
+      var resObj;
+      if (err === ERR_SUCCESS) {
+        console.log("  :Failed to add subscribe info to IdTable. Cancel the timer.");
+        resObj = createAuthorizeSuccessResponse(reqId, AUTHORIZE_TTL);
+      } else {
+        resObj = createAuthorizeErrorResponse(reqId, err);
+      }
+      ws.send(JSON.stringify(resObj));
+      // TODO: AuthorizeのTTLのexpire はどのように実現する？
 
     } else if (obj.action === "getVSS") {
       // TODO:
@@ -739,6 +756,21 @@ function getUniqueSubId() {
   return "subid-"+uniq;
 }
 
+// ==================
+// == helper funcs ==
+// ==================
+function extractTargetVss(_vssObj, _path) {
+  //TODO: empty func. do this later.
+  return _vssObj;
+}
+function judgeAuthorizeToken(token) {
+  //TODO: empty func. for now, return SUCCESS if token exists.
+  if (token)
+    return ERR_SUCCESS;
+  else
+    return ERR_INVALID_TOKEN;
+}
+
 // ===================
 // == JSON Creation ==
 // ===================
@@ -786,6 +818,7 @@ function createSetErrorResponse(reqId, error, timestamp) {
   return retObj;
 }
 
+// == getVSS ==
 function createVssSuccessResponse(reqId, vss) {
   //console.log("createVssSuccessResponse");
   var retObj = {"action": "getVSS", "requestId":reqId, "vss":vss};
@@ -796,8 +829,13 @@ function createVssErrorResponse(reqId, error, timestamp) {
   var retObj = {"action": "getVSS", "requestId":reqId, "error":error};
   return retObj;
 }
-function extractTargetVss(_vssObj, _path) {
-  //TODO: 今は空実装。後で実装する
-  return _vssObj;
+// == authorize ==
+function createAuthorizeSuccessResponse(reqId, ttl) {
+  var retObj = {"action": "authorize", "requestId":reqId, "TTL":ttl};
+  return retObj;
+}
+function createAuthorizeErrorResponse(reqId, err) {
+  var retObj = {"action": "authorize", "requestId":reqId, "error":err};
+  return retObj;
 }
 

@@ -29,6 +29,8 @@
   <style>
     #msg { height:600px; width:1200px; background-color:lightgrey; font-size:14px;}
     #msg_vss { height:100px; width:500px; background-color:lightgrey; font-size:14px;}
+    #msg_getvss { height:20px; width:500px; background-color:lightgrey; font-size:14px;}
+    #msg_authorize { height:20px; width:500px; background-color:lightgrey; font-size:14px;}
     .msg_vss_desc { height: 20px; width:500px; background-color:lightgrey; font-size:14px; display:inline-block;}
     .val_area { height: 20px; width:150px; background-color:lightgrey; font-size:14px; display:inline-block;}
     #server_info {height:20px; width:500px; font-size:13px;}
@@ -52,7 +54,7 @@
       <br><button onclick="btnAuthorize();">authorize</button>
       <span class="val_area" id="msg_authorize"></span>
       <br><button onclick="btnGetVss();">get VSS</button>
-      <span class="val_area" id="msg_get_vss"></span>
+      <span class="val_area" id="msg_getvss"></span>
       <br>
 
       <br><button onclick="btnGetSpeed();">get speed</button>
@@ -292,7 +294,11 @@
 
     // case of 'get'
     if (action === "get") {
-      showMsgByActionAndPath(msg.value, reqObj.action, reqObj.path, reqTableItem.dispId);
+      if (reqTableItem.dispId === 'msg_vss')
+        showGetVssResMsg(msg.value, reqObj.action, reqObj.path);
+      else
+        showGetResMsg(msg.value, reqTableItem.dispId)
+
       // delete request from requestHash. delete even in error case
       g_reqTable.delReqByReqId(reqId);
     // case of 'set'
@@ -320,8 +326,10 @@
 
       } else if (isSubscriptionNotification(msg)) {
         // case of subscribeNotification
-        //showInMsgArea("--:msgtype: SubscriptionNotification");
-        showMsgByActionAndPath(msg.value, reqObj.action, reqObj.path, reqTableItem.dispId);
+        if (reqTableItem.dispId === 'msg_vss')
+          showGetVssResMsg(msg.value, reqObj.action, reqObj.path);
+        else
+          showGetResMsg(msg.value, reqTableItem.dispId)
 
       } else if (isSubscriptionNotificationError(msg)) {
         //showInMsgArea("--:msgtype: SubscriptionNotificationError");
@@ -354,11 +362,20 @@
       }
     // case of 'authorize'
     } else if (action === "authorize") {
-      //TODO
-
+      if (isAuthorizeSuccessResponse(msg)) {
+        showGetResMsg("Authorized! TTL="+msg.TTL, reqTableItem.dispId);
+      } else if (isAuthorizeErrorResponse(msg)) {
+        showGetResMsg("Rejected! err="+msg.error, reqTableItem.dispId);
+      }
+      g_reqTable.delReqByReqId(reqId);
     // case of 'getVSS'
     } else if (action === "getVSS") {
       // received VSS is shown in log msg textarea
+      if (isVssSuccessResponse(msg)) {
+        showGetResMsg("Successfully retrieved VSS json.", reqTableItem.dispId);
+      } else if (isVssErrorResponse(msg)) {
+        showGetResMsg("Failed.", reqTableItem.dispId);
+      }
       g_reqTable.delReqByReqId(reqId);
     } else {
       // others
@@ -399,13 +416,22 @@
   var dummyToken_user   = "aaaaa";
   var dummyToken_device = "bbbbb";
   function wsAuthorize(_userToken, _deviceToken) {
-    //TODO: ’†g‚ð‘‚­
-    // ‘—MJSONì¬
-    // ws‘—M
+    showInMsgArea("wsAuthorize:");
+    if (g_vehicle != null && g_vehicle.readyState === 1) {
+      var reqId = getUniqueReqId();
+      var tokens = {"authorization"     :dummyToken_user,
+                    "www-vehicle-device":dummyToken_device};
+      var req = {"action": "authorize", "tokens": tokens, "requestId":reqId};
+      var item = {"reqObj": req, "dispId": 'msg_authorize'};
+      g_reqTable.addReqByReqId(reqId, item);
+      var json_str = JSON.stringify(req);
+      g_vehicle.send(json_str);
+      showInMsgArea("--: ==> " + json_str);
+    }
   }
 
   function btnAuthorize() {
-    wsAuthorize(dummyToken_user, '');
+    wsAuthorize(dummyToken_user, dummyToken_device);
   }
 
   // === getVSS ===
@@ -415,14 +441,13 @@
     if (g_vehicle != null && g_vehicle.readyState === 1) {
       var reqId = getUniqueReqId();
       var req = {"action": "getVSS", "path": _path, "requestId":reqId};
-      var item = {"reqObj": req, "dispId": 'msg'};
+      var item = {"reqObj": req, "dispId": 'msg_getvss'};
       g_reqTable.addReqByReqId(reqId, item);
       var json_str = JSON.stringify(req);
       g_vehicle.send(json_str);
       showInMsgArea("--: ==> " + json_str);
     }
   }
-
   var getVssPath = '';
   function btnGetVss() {
     wsGetVss(getVssPath);
@@ -613,7 +638,7 @@
     var _max = leaf.max!=undefined ?   leaf.max:' - ';
     var _min = leaf.min!=undefined ?   leaf.min:' - ';
     var _desc = leaf.desc!=undefined ? leaf.desc:' - ';
-    
+
     var _enum = (function(){
       if(leaf.enum!=undefined && leaf.enum.length>0)
         return leaf.enum.join(' / ');
@@ -629,12 +654,8 @@
     vss_desc2.innerHTML = txt2;
   }
 
-  // *** Authorize *** [TODO]
-  // *** getVSS ***    [TODO]
-  // *** Ohters ***    [TODO]
-
   // == subscribe helper funcs ==
-  // to detect type of Json message
+  // Judge returned Json message's type
   function isSubscribeSuccessResponse(msg) {
     // This is subscribeSuccessResponse if ...
     // must exist    : (action), requestId, subscriptionId, (timestamp)
@@ -676,6 +697,38 @@
     else
       return false;
   }
+  // == authorize helper funcs ==
+  // Judge returned Json message's type
+  function isAuthorizeSuccessResponse(msg) {
+    if (msg.action === "authorize" && msg.requestId != undefined && msg.TTL != undefined &&
+        msg.error == undefined)
+      return true;
+    else
+      return false;
+  }
+  function isAuthorizeErrorResponse(msg) {
+    if (msg.action === "authorize" && msg.requestId != undefined && msg.TTL == undefined &&
+        msg.error != undefined)
+      return true;
+    else
+      return false;
+  }
+  // == getVSS helper funcs ==
+  // Judge returned Json message's type
+  function isVssSuccessResponse(msg) {
+    if (msg.action === "getVSS" && msg.requestId != undefined && msg.vss != undefined &&
+        msg.error == undefined)
+      return true;
+    else
+      return false;
+  }
+  function isVssErrorResponse(msg) {
+    if (msg.action === "authorize" && msg.requestId != undefined && msg.vss == undefined &&
+        msg.error != undefined)
+      return true;
+    else
+      return false;
+  }
 
   // ===================
   // == Utility funcs ==
@@ -692,33 +745,20 @@
   function showInMsgArea(msgText) {
     showInMsgAreaById(msgText, 'msg', 6000);
   }
-  function showInVssMsgArea(value, action, path) {
-    //var msgText = action + " : " + path + "<br>==> value : "+value;
-    var msgText = action + " : " + path + "\n==> value : "+value;
-    showInMsgAreaById(msgText, 'msg_vss', 200);
-  }
   function showInMsgAreaById(msgText, id, size_limit) {
     var targ = document.getElementById(id);
     var oldText = targ.innerHTML;
     oldText = oldText.substring(0, size_limit);
-    //var newText = msgText + "<br>" + oldText;
     var newText = msgText + "\n" + oldText;
     targ.innerHTML = newText;
   }
-  /*
-  function showMsgById(msgText, idTarg) {
-    var targ = document.getElementById(idTarg);
-    targ.innerHTML = msgText;
+  function showGetResMsg(value, targ_id) {
+    var targ = document.getElementById(targ_id);
+    targ.innerHTML = value;
   }
-  */
-  function showMsgByActionAndPath(value, action, path, targ_id) {
-    if (targ_id === 'msg_vss') {
-      //exceptional case
-      showInVssMsgArea(value, action, path);
-    } else {
-      var targ = document.getElementById(targ_id);
-      targ.innerHTML = value;
-    }
+  function showGetVssResMsg(value, action, path) {
+    var msgText = action + " : " + path + "\n==> value : "+value;
+    showInMsgAreaById(msgText, 'msg_vss', 200);
   }
 
   function showConnectMsg(msgText) {
