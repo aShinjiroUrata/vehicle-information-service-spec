@@ -51,7 +51,7 @@
 
       <br><button onclick="btnAuthorize();">authorize</button>
       <span class="val_area" id="msg_authorize"></span>
-      <br><button onclick="btnGetVssFile();">get VSS</button>
+      <br><button onclick="btnGetVss();">get VSS</button>
       <span class="val_area" id="msg_get_vss"></span>
       <br>
 
@@ -92,19 +92,19 @@
       <br><span class="msg_vss_desc" id="msg_vss_desc1"></span>
       <br><span class="msg_vss_desc" id="msg_vss_desc2"></span>
       <br>
-      <button onclick="btnGetVss();">get</button>
-      <button onclick="btnSubscribeVss();">subscribe</button>
-      <button onclick="btnUnsubscribeVss();">unsubscribe</button><br>
-      <button onclick="btnSetVss();">set</button>
+      <button onclick="btnGetAnyItem();">get</button>
+      <button onclick="btnSubscribeAnyItem();">subscribe</button>
+      <button onclick="btnUnsubscribeAnyItem();">unsubscribe</button><br>
+      <button onclick="btnSetAnyItem();">set</button>
       <input type="text" class="val_area" id="txt_vss_set" ></input>
       <br>
       <button onclick="clearVssMsgArea();">clearMsgArea</button>
-      <div id="msg_vss"></div>
+      <textarea id="msg_vss"></textarea>
 
     </main>
     <div id="right">
       <button onclick="clearMsgArea();">clearMsgArea</button>
-      <div id="msg"></div>
+      <textarea id="msg"></textarea>
     </div>
   </div>
 
@@ -267,7 +267,7 @@
 
   function onWsMessage(event) {
     //showInMsgArea("onWsMessage: ");
-    showInMsgArea("--: <== " + event.data);
+    showInMsgArea("--: <== " + event.data.substr(0,3000));
 
     var msg;
     try {
@@ -276,23 +276,23 @@
       showInMsgArea("Irregular Json received. Ignore.");
       return;
     }
-    var queItem=null, reqObj=null, action=null, reqId=null, subId=null;
+    var reqTableItem=null, reqObj=null, action=null, reqId=null, subId=null;
     if (msg.requestId != undefined) {
       reqId = msg.requestId;
-      queItem = g_reqTable.getReqByReqId(reqId);
-      reqObj = queItem.reqObj;
+      reqTableItem = g_reqTable.getReqByReqId(reqId);
+      reqObj = reqTableItem.reqObj;
     } else if (msg.subscriptionId != undefined) { 
       //reqIdなし、subIdあり＝subscribe notification の場合
       subId = msg.subscriptionId;
-      queItem = g_reqTable.getReqBySubId(subId);
-      reqObj = queItem.reqObj;
+      reqTableItem = g_reqTable.getReqBySubId(subId);
+      reqObj = reqTableItem.reqObj;
     }
     action = reqObj.action;
     //showInMsgArea("--:action="+action);
 
     // case of 'get'
     if (action === "get") {
-      showMsgByActionAndPath(msg.value, reqObj.action, reqObj.path, queItem.dispId);
+      showMsgByActionAndPath(msg.value, reqObj.action, reqObj.path, reqTableItem.dispId);
       // delete request from requestHash. delete even in error case
       g_reqTable.delReqByReqId(reqId);
     // case of 'set'
@@ -321,7 +321,7 @@
       } else if (isSubscriptionNotification(msg)) {
         // case of subscribeNotification
         //showInMsgArea("--:msgtype: SubscriptionNotification");
-        showMsgByActionAndPath(msg.value, reqObj.action, reqObj.path, queItem.dispId);
+        showMsgByActionAndPath(msg.value, reqObj.action, reqObj.path, reqTableItem.dispId);
 
       } else if (isSubscriptionNotificationError(msg)) {
         //showInMsgArea("--:msgtype: SubscriptionNotificationError");
@@ -352,8 +352,14 @@
         // clear flag for button lock
         g_ui.clearSubscribeBtnLock(targ_reqId);
       }
+    // case of 'authorize'
+    } else if (action === "authorize") {
+      //TODO
 
-    // TODO: set, authorize, getVSS
+    // case of 'getVSS'
+    } else if (action === "getVSS") {
+      // received VSS is shown in log msg textarea
+      g_reqTable.delReqByReqId(reqId);
     } else {
       // others
     }
@@ -383,16 +389,44 @@
     }
     g_vehicle.close();
     g_vehicle = null;
-    //clearIdTable();
     g_reqTable.clearReqTable();
     showConnectMsg("WS Disconnected");
   }
 
   // === authorize ===
   // TODO:
+  // とりあえずはダミーのトークンでよいか。。
+  var dummyToken_user   = "aaaaa";
+  var dummyToken_device = "bbbbb";
+  function wsAuthorize(_userToken, _deviceToken) {
+    //TODO: 中身を書く
+    // 送信JSON作成
+    // ws送信
+  }
+
+  function btnAuthorize() {
+    wsAuthorize(dummyToken_user, '');
+  }
 
   // === getVSS ===
-  // TODO:
+  function wsGetVss(_path) {
+    //TODO: get VSS under path: not suppoted yet
+    showInMsgArea("wsGetVss:");
+    if (g_vehicle != null && g_vehicle.readyState === 1) {
+      var reqId = getUniqueReqId();
+      var req = {"action": "getVSS", "path": _path, "requestId":reqId};
+      var item = {"reqObj": req, "dispId": 'msg'};
+      g_reqTable.addReqByReqId(reqId, item);
+      var json_str = JSON.stringify(req);
+      g_vehicle.send(json_str);
+      showInMsgArea("--: ==> " + json_str);
+    }
+  }
+
+  var getVssPath = '';
+  function btnGetVss() {
+    wsGetVss(getVssPath);
+  }
 
   // === get ===
   function wsGetItem(_path, _dispId) {
@@ -525,23 +559,28 @@
   }
 
   // === VSS item: get/set/sub/unsub ===
-  function btnGetVss() {
-    var path = getSelectedVssPath();
+  function btnGetAnyItem() {
+    var path = getSelectedVssItemPath();
     wsGetItem(path, "msg_vss");
   }
-  function btnSetVss() {
-    var path = getSelectedVssPath();
-    var value = getVssTextVal();
+  function btnSetAnyItem() {
+    var path = getSelectedVssItemPath();
+    var value = getItemValToSet();
     wsSetItem(path,value, "msg_vss");
   }
-  function btnSubscribeVss() {
-    var path = getSelectedVssPath();
+  function btnSubscribeAnyItem() {
+    var path = getSelectedVssItemPath();
     var reqId = getUniqueReqId();
+    // not allow subscribing same data path twice.
+    if (g_ui.vssSubscribeReqId[path] != undefined) {
+      showInMsgArea("Thie data item is already subscibed.")
+      return;
+    }
     g_ui.vssSubscribeReqId[path] = reqId; //save path:reqId in global
     wsSubscribeItem(path, reqId, "msg_vss");
   }
-  function btnUnsubscribeVss() {
-    var path = getSelectedVssPath();
+  function btnUnsubscribeAnyItem() {
+    var path = getSelectedVssItemPath();
     var targ_reqId = g_ui.vssSubscribeReqId[path];
     if (targ_reqId == undefined) {
       showInMsgArea("This VSS item is not subscribed");
@@ -552,18 +591,18 @@
     var targ_subId = g_reqTable.getSubIdByReqId(targ_reqId);
     wsUnsubscribeItem(path, targ_subId, "msg_vss");
   }
-  function getSelectedVssPath() {
+  function getSelectedVssItemPath() {
     var sel_path = document.getElementById("sel_path");
     var idx = sel_path.selectedIndex;
     var val = sel_path[idx].value;
     return val;
   }
-  function getVssTextVal() {
+  function getItemValToSet() {
     var val = document.getElementById("txt_vss_set").value;
     return val;
   }
-  function selVssOnChange() {
-    var path = getSelectedVssPath();
+  function selVssPathOnChange() {
+    var path = getSelectedVssItemPath();
     if (path=='' || path=='----') return;
     if (g_vssObj == null) return;
 
@@ -651,24 +690,27 @@
   }
 
   function showInMsgArea(msgText) {
-    showInMsgAreaById(msgText, 'msg', 3000);
+    showInMsgAreaById(msgText, 'msg', 6000);
   }
   function showInVssMsgArea(value, action, path) {
-    var msgText = action + " : " + path + "<br>==> value : "+value;
+    //var msgText = action + " : " + path + "<br>==> value : "+value;
+    var msgText = action + " : " + path + "\n==> value : "+value;
     showInMsgAreaById(msgText, 'msg_vss', 200);
   }
   function showInMsgAreaById(msgText, id, size_limit) {
     var targ = document.getElementById(id);
     var oldText = targ.innerHTML;
     oldText = oldText.substring(0, size_limit);
-    var newText = msgText + "<br>" + oldText;
+    //var newText = msgText + "<br>" + oldText;
+    var newText = msgText + "\n" + oldText;
     targ.innerHTML = newText;
   }
+  /*
   function showMsgById(msgText, idTarg) {
     var targ = document.getElementById(idTarg);
     targ.innerHTML = msgText;
   }
-
+  */
   function showMsgByActionAndPath(value, action, path, targ_id) {
     if (targ_id === 'msg_vss') {
       //exceptional case
@@ -786,7 +828,7 @@
           document.getElementById("sel_path").appendChild(opt);
         }
         var sel = document.getElementById("sel_path");
-        sel.onchange = function(e){ selVssOnChange();};
+        sel.onchange = function(e){ selVssPathOnChange();};
       }
       xhr.send(null);
     }

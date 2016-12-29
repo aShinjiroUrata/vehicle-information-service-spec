@@ -149,7 +149,7 @@ var g_extMockDataSrc = (function() {
   var m_svrUrl = "ws://"+EXT_MOCKSVR_IP+":"+EXT_MOCKSVR_PORT;
   var m_conn = null;
 
-  var setReqHash = {}; //{setReqId : {'requestId':reqId, 'sessionId':sessId}}
+  var dataSrcReqHash = {}; //{dataSrcReqId : {'requestId':reqId, 'sessionId':sessId}}
 
   var obj = {
     svrUrl: m_svrUrl,
@@ -177,35 +177,58 @@ var g_extMockDataSrc = (function() {
     sendSetRequest: function(obj, _reqId, _sessId) {
       if (m_conn != null) {
         //console.log("sendSetRequest: ");
-        var setReqId = this.createSetReqId();
-        var sendObj = this.createExtMockSvrSetRequestJson(obj, setReqId);
-        this.addSetReqHash(setReqId, _reqId, _sessId);
+        var dataSrcReqId = this.createDataSrcReqId();
+        var sendObj = this.createExtMockSvrSetRequestJson(obj, dataSrcReqId);
+        this.addDataSrcReqHash(dataSrcReqId, _reqId, _sessId);
+        //console.log("  :sendObj="+JSON.stringify(sendObj));
+        m_conn.sendUTF(JSON.stringify(sendObj));
+      }
+    },
+    //send VSS json(full) request to mockDataSrc
+    sendVssRequest: function(obj, _reqId, _sessId) {
+      if (m_conn != null) {
+        //console.log("sendSetRequest: ");
+        var dataSrcReqId = this.createDataSrcReqId();
+        var sendObj = this.createExtMockSvrVssRequestJson(obj, dataSrcReqId);
+        this.addDataSrcReqHash(dataSrcReqId, _reqId, _sessId);
         //console.log("  :sendObj="+JSON.stringify(sendObj));
         m_conn.sendUTF(JSON.stringify(sendObj));
       }
     },
 
-    createSetReqId: function() {
+    createDataSrcReqId: function() {
       var uniq = getSemiUniqueId();
-      return "setreqid-"+uniq;
+      return "datasrcreqid-"+uniq;
     },
 
-    //function createExtMockSvrSetRequestJson(_obj, _reqId, _sessId) {
-    createExtMockSvrSetRequestJson: function(_obj, _setReqId) {
+    createExtMockSvrSetRequestJson: function(_obj, _dataSrcReqId) {
       //console.log("createExtMockSvrSetRequestJson");
       var retObj = {"action": "set", "path": _obj.path, "value": _obj.value,
-                    "setRequestId":_setReqId};
+                    "dataSrcRequestId":_dataSrcReqId};
       return retObj;
     },
-    addSetReqHash: function(_setReqId, _reqId, _sessId) {
-      setReqHash[_setReqId] = {'requestId':_reqId, 'sessionId':_sessId};
+    createExtMockSvrVssRequestJson: function(_obj, _dataSrcReqId) {
+      //console.log("createExtMockSvrSetRequestJson");
+      // full VSS jsonを要求するのでpathは不要
+      var retObj = {"action": "getVSS",
+                    //"path": _obj.path,
+                    "dataSrcRequestId":_dataSrcReqId};
+      return retObj;
     },
-    delSetReqHash: function(_setReqId) {
-      delete setReqHash[_setReqId];
+
+    addDataSrcReqHash: function(_dataSrcReqId, _reqId, _sessId) {
+      dataSrcReqHash[_dataSrcReqId] = {'requestId':_reqId, 'sessionId':_sessId};
+      console.log("addDataSrcReqHash["+_dataSrcReqId+"] = "
+                  + JSON.stringify(dataSrcReqHash[_dataSrcReqId]));
     },
-    getReqIdSessIdObj: function(_setReqId) {
-      return setReqHash[_setReqId];
+
+    delDataSrcReqHash: function(_dataSrcReqId) {
+      delete dataSrcReqHash[_dataSrcReqId];
+    },
+    getReqIdSessIdObj: function(_dataSrcReqId) {
+      return dataSrcReqHash[_dataSrcReqId];
     }
+
 
   }
   return obj;
@@ -499,15 +522,13 @@ wssvr.on('connection', function(ws) {
 
     } else if (obj.action === "getVSS") {
       // TODO:
-      // 機械的にVSSを送り返せばよい？
-      // 形式はJSONで？
-      // VSSは本来は車両が持っている情報
-      // とすると、mockDataSrcに問い合わせて取得してもよい気がする
-      // が、単純化のために、Vsss内で固定のJSONを返すことにする
-      // VSSを受けてクライアント側は何に使うのが正しい？
-      // 本来は、クライアントは車両からVSSを受け取り、利用可能なデータ項目を知るはず
-      // とすると、clientの実装はVSS受信して、それにあった状態になるべき
-      // が、それは先の課題としておく_
+      // - VSS json は dataSrcからもらう
+      // - 指定path以下のVSSツリー抽出は、VSSSでやるか。(dataSrcに仕事をさせすぎない)
+      // VSS は VSSSが持っている？ or dataSrcが持っている？=> dataSrcが持つもの
+      var reqId = obj.requestId;
+      var path = obj.path;
+      var ret = _reqTable.addReqToTable(obj, null, null);
+      g_extMockDataSrc.sendVssRequest(obj, reqId, _sessId);
 
     // for 'subscribe'
     } else if (obj.action === "subscribe") {
@@ -523,10 +544,10 @@ wssvr.on('connection', function(ws) {
       if (ret == false) {
         console.log("  :Failed to add subscribe info to IdTable. Cancel the timer.");
         var error = -1; //TODO: select correct error code
-        resObj = createSubscribeErrorResponseJson(action, reqId, path, error, timestamp);
+        resObj = createSubscribeErrorResponse(action, reqId, path, error, timestamp);
       } else {
         console.log("  :subscribe started. reqId=" + reqId + ", subId=" + subId + ", path=" + path);
-        resObj = createSubscribeSuccessResponseJson(action, reqId, subId, timestamp);
+        resObj = createSubscribeSuccessResponse(action, reqId, subId, timestamp);
       }
       ws.send(JSON.stringify(resObj));
 
@@ -538,12 +559,11 @@ wssvr.on('connection', function(ws) {
       var ret = _reqTable.delReqByReqId(targ_reqId); // subscribeのentryを削除
       var timestamp = new Date().getTime().toString(10);
       if (ret == true) {
-        resObj = createUnsubscribeSuccessResponseJson(obj.action, reqId, targ_subId, timestamp);
+        resObj = createUnsubscribeSuccessResponse(obj.action, reqId, targ_subId, timestamp);
       } else {
         var err = -1; //TODO: select correct error value
-        resObj = createUnsubscribeErrorResponseJson(obj.action, reqId, targ_subId, err, timestamp);
+        resObj = createUnsubscribeErrorResponse(obj.action, reqId, targ_subId, err, timestamp);
       }
-      // TODO: thisの方がよい？
       ws.send(JSON.stringify(resObj));
 
     } else {
@@ -578,50 +598,63 @@ function dataReceiveHandler(message) {
   }
   var dataObj = obj.data; // dataSrcからpushされる通常のdata
   var setObj = obj.set;   // dataSrcにset をrequestしたときのresponse
+  var vssObj = obj.vss;   // dataSrcへのVSS jsonのrequsestへのresponse
+  var resObj;
 
   var matchObj;
   var retObj, reqObj;
 
-　// setのresponseが来た場合
-  if (setObj != undefined) {
-    // handler for 'set' response
-    // (#setObj contains only one set response)
-    console.log("  :set message=" + JSON.stringify(setObj));
+  // if 'getVSS' or 'set' response exists..
+  if (vssObj || setObj) {
+    //console.log("  :getVss message=" + JSON.stringify(vssObj).substr(0,200));
+    if (vssObj)
+      resObj = vssObj;
+    else
+      resObj = setObj;
 
     do { // for exitting by 'break'
-      var _setReqId = setObj.setRequestId;
-      var _reqIdsessIdObj = g_extMockDataSrc.getReqIdSessIdObj(_setReqId);
+      var _dataSrcReqId = resObj.dataSrcRequestId;
+      var _reqIdsessIdObj = g_extMockDataSrc.getReqIdSessIdObj(_dataSrcReqId);
       console.log("  :reqIdsessIdObj=" + JSON.stringify(_reqIdsessIdObj));
-      if (_reqIdsessIdObj == undefined) break;
+      if (_reqIdsessIdObj == undefined) {
+        break;
+      }
       var _sessId = _reqIdsessIdObj.sessionId;
       var _reqId = _reqIdsessIdObj.requestId;
       // As set response is returned, delete from hash.
-      g_extMockDataSrc.delSetReqHash[_setReqId];
-
-      if (_sessId == undefined ||_reqId == undefined) break;
+      g_extMockDataSrc.delDataSrcReqHash[_dataSrcReqId];
 
       var _sessObj = g_sessionHash[_sessId];
-      if (_sessObj == undefined) break;
       var _reqTable = _sessObj.reqTable;
       var _ws = _sessObj.ws;
       var _reqObj = _reqTable.requestHash[_reqId];
-      if (_reqObj == undefined) break;
 
-      if (setObj.error != undefined) {
-        retObj = createSetErrorResponseJson(_reqObj.requestId, setObj.error, setObj.timestamp);
+      if (vssObj) {
+        if (resObj.error != undefined) {
+          retObj = createVssErrorResponse(_reqObj.requestId, resObj.error);
+        } else {
+          //TODO:指定path以下のVSSを抜き出す
+          var targetVss = extractTargetVss(resObj.vss, _reqObj.path);
+          retObj = createVssSuccessResponse(_reqObj.requestId, targetVss);
+        }
+        console.log("  :getVss response="+JSON.stringify(retObj).substr(0,3000));
       } else {
-        retObj = createSetSuccessResponseJson(_reqObj.requestId, setObj.timestamp);
+        if (resObj.error != undefined) {
+          retObj = createSetErrorResponse(_reqObj.requestId, resObj.error, resObj.timestamp);
+        } else {
+          retObj = createSetSuccessResponse(_reqObj.requestId, resObj.timestamp);
+        }
+        console.log("  :set response="+JSON.stringify(retObj));
       }
-      console.log("  :set response="+JSON.stringify(retObj));
+
       if (_ws != null) {
-        console.log("  :_ws.send "+JSON.stringify(retObj));
+        // send back VSS json to client
         _ws.send(JSON.stringify(retObj));
       }
       // delete this request from queue
       _reqTable.delReqByReqId(_reqObj.requestId);
 
     } while(false);
-
   // 通常のpush データへの対応
   // handler for 'data' notification from data source
   // handle 'get' and 'subscribe' at here
@@ -647,7 +680,7 @@ function dataReceiveHandler(message) {
         if ((matchObj = matchPath(reqObj, dataObj)) != undefined) {
           if (reqObj.action === "get") {
             // send back 'getSuccessResponse'
-            retObj = createGetSuccessResponseJson(reqObj.requestId, matchObj.value, matchObj.timestamp);
+            retObj = createGetSuccessResponse(reqObj.requestId, matchObj.value, matchObj.timestamp);
             if (_ws != null)
               _ws.send(JSON.stringify(retObj));
             // delete this request from queue
@@ -659,9 +692,7 @@ function dataReceiveHandler(message) {
                         reqObj.action, reqObj.path, matchObj.value, matchObj.timestamp);
             if (_ws != null)
               _ws.send(JSON.stringify(retObj));
-          //} else if (reqObj.action === "set") {
           //} else if (reqObj.action === "authorize") {
-          //} else if (reqObj.action === "getVSS") {
           } else {
             // nothing to do
           }
@@ -711,17 +742,17 @@ function getUniqueSubId() {
 // ===================
 // == JSON Creation ==
 // ===================
-function createGetSuccessResponseJson(reqId, value, timestamp) {
+function createGetSuccessResponse(reqId, value, timestamp) {
   var retObj = {"requestId": reqId, "value": value, "timestamp":timestamp};
   return retObj;
 }
 
-function createSubscribeSuccessResponseJson(action, reqId, subId, timestamp) {
+function createSubscribeSuccessResponse(action, reqId, subId, timestamp) {
   var retObj = {"action":action, "requestId":reqId, "subscriptionId":subId, 
                 "timestamp":timestamp};
   return retObj;
 }
-function createSubscribeErrorResponseJson(action, reqId, path, error, timestamp) {
+function createSubscribeErrorResponse(action, reqId, path, error, timestamp) {
   //TODO: fix format later
   var retObj = {"requestId":reqId, "path":path, "error":error,
                 "timestamp":timestamp};
@@ -733,25 +764,40 @@ function createSubscribeNotificationJson(reqId, subId, action, path, val, timest
   return retObj;
 }
 
-function createUnsubscribeSuccessResponseJson(action, reqId, subId, timestamp) {
+function createUnsubscribeSuccessResponse(action, reqId, subId, timestamp) {
   var retObj = {"action": action, "requestId":reqId, "subscriptionId":subId,
                 "timestamp":timestamp};
   return retObj;
 }
-function createUnsubscribeErrorResponseJson(action, reqId, subId, error, timestamp) {
+function createUnsubscribeErrorResponse(action, reqId, subId, error, timestamp) {
   var retObj = {"action": action, "requestId":reqId, "subscriptionId":subId,
                 "error":error, "timestamp":timestamp};
   return retObj;
 }
 
-function createSetSuccessResponseJson(reqId, timestamp) {
-  //console.log("createSetSuccessResponseJson");
+function createSetSuccessResponse(reqId, timestamp) {
+  //console.log("createSetSuccessResponse");
   var retObj = {"action": "set", "requestId":reqId, "timestamp":timestamp};
   return retObj;
 }
-function createSetErrorResponseJson(reqId, error, timestamp) {
-  //console.log("createSetErrorResponseJson");
+function createSetErrorResponse(reqId, error, timestamp) {
+  //console.log("createSetErrorResponse");
   var retObj = {"action": "set", "requestId":reqId, "error":error, "timestamp":timestamp};
   return retObj;
+}
+
+function createVssSuccessResponse(reqId, vss) {
+  //console.log("createVssSuccessResponse");
+  var retObj = {"action": "getVSS", "requestId":reqId, "vss":vss};
+  return retObj;
+}
+function createVssErrorResponse(reqId, error, timestamp) {
+  //console.log("createVssErrorResponse");
+  var retObj = {"action": "getVSS", "requestId":reqId, "error":error};
+  return retObj;
+}
+function extractTargetVss(_vssObj, _path) {
+  //TODO: 今は空実装。後で実装する
+  return _vssObj;
 }
 

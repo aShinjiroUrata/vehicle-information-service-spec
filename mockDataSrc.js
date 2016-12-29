@@ -34,14 +34,14 @@ var g_updateList = [
 var fs = require('fs');
 
 //TODO: json ファイル名を引数で与える
-var vss;
+var g_vss;
 try {
-  vss = JSON.parse(fs.readFileSync('./vss.json', 'utf8'));
+  g_vss = JSON.parse(fs.readFileSync('./vss.json', 'utf8'));
 } catch(e) {
   console.log("Irregular format of VSS json. Exit.");
   return;
 }
-var g_dataObj = initDataObj(vss);
+var g_dataObj = initDataObj(g_vss);
 
 // ===========================
 // == Start WebSocketServer ==
@@ -94,8 +94,11 @@ dataSrcSvr.on('request', function(request) {
         //console.log('  :reqObj = '+ JSON.stringify(reqObj));
         var result = saveSetData(reqObj.path, reqObj.value);
         var retObj = createSetResponse(result, reqObj.path, reqObj.value,
-                                        reqObj.setRequestId);
+                                        reqObj.dataSrcRequestId);
         //console.log('  :retObj = '+ JSON.stringify(retObj));
+        conn.sendUTF(JSON.stringify(retObj));
+      } else if (reqObj.action === 'getVSS') {
+        var retObj = createVssResponse(g_vss, reqObj.dataSrcRequestId);
         conn.sendUTF(JSON.stringify(retObj));
       }
     }
@@ -249,19 +252,26 @@ function saveSetData(_path, _value) {
   return ERR_OK;
 }
 
-function createSetResponse(result, path, value, setReqId) {
+function createSetResponse(result, path, value, dataSrcReqId) {
   var dataObj;
   var timestamp = new Date().getTime().toString(10);
 
   if (result == ERR_OK) {
     dataObj = {'action':'set', 'path':path, 'value':value,
-               'setRequestId':setReqId, 'timestamp':timestamp};
+               'dataSrcRequestId':dataSrcReqId, 'timestamp':timestamp};
   } else {
     var err = getErrorObj(result);
     dataObj = {'action':'set', 'path':path, 'error':err,
-               'setRequestId':setReqId, 'timestamp':timestamp};
+               'dataSrcRequestId':dataSrcReqId, 'timestamp':timestamp};
   }
   var obj = {"set": dataObj};
+  return obj;
+}
+
+function createVssResponse(_origVssObj, dataSrcReqId) {
+  var dataObj = {'action':'getVSS', 'vss':_origVssObj,
+               'dataSrcRequestId':dataSrcReqId};
+  var obj = {"vss": dataObj};
   return obj;
 }
 
