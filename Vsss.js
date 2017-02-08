@@ -1,28 +1,20 @@
 //
-// Vehicle Signal Server prototype implementation
+// Vehicle Information Server prototype implementation
 //
-// to use:
-// 1.Install packages
-//   $npm install ws socket.io
-// 2.Edit Vsss.js code
-// - edit Vsss's IP address by change VSSS_IP value.(change port if you like)
-// - select data source to connect
+// - data source to connect ( only EXT_MOCK_SERVER is supported for now)
 //   - LOCAL_MOCK_DATA : to use hard coded data source driven by timer
 //   - EXT_MOCK_SERVER : to use external websocket mock server 'mockDataSvr.js'
 //   - EXT_SIP_SERVER  : to use websocket server which hosts actual vehicle data
 //                       developed for SIP hackathon.
-// 3.Start Vehicle Signal Server
-//   $node Vsss.js
-// 4 Open test-ui app by browser via url= http://{VSSS_IP}:{HTTP_SVR_PORT}
-// 5.If EXT_MOCK_SERVER data source is selected, start external mock data source
-//   (*Edit IP, port in mockDataSvr.js to match with Vsss.js)
-//   $node mockDataSrc.js
-// 6.If EXT_SIP_SERVER data source is selected, start SIP hackathon server
-// - Open SIP hackathon server app by google chrome (*URL is not public)
-// - enter roomID='room01' and submit
-// - select drive data and start to play the data
 
 "use strict"
+
+// == Server IP and Port Number ==
+var svr_config = require('./svr_config');
+var VISS_IP = svr_config.VISS_IP;
+var VISS_PORT = svr_config.VISS_PORT;
+var EXT_MOCKSVR_IP = '127.0.0.1';
+var EXT_MOCKSVR_PORT = 3001;
 
 // == data source selection ==
 var LOCAL_MOCK_DATA = 0;
@@ -33,50 +25,23 @@ var EXT_SIP_SERVER = 2;
 var dataSrc = EXT_MOCK_SERVER;
 //var dataSrc = EXT_SIP_SERVER;
 
-// == Config this Vehicle Singal Server IP and Port Number here ==
-var VSSS_IP = '10.5.162.79'; // VSSS's host IP
-var HTTP_SVR_PORT = 8081;
-var VSSS_PORT = 3000;
-
-var EXT_MOCKSVR_IP = '127.0.0.1';
-var EXT_MOCKSVR_PORT = 3001;
-
 // == Error value definition ==
+// TODO: add more
 var ERR_SUCCESS = 'success';
 var ERR_INVALID_TOKEN = 'invalid token';
 
 // == static values ==
-// TODO: TTLは有効な期間(1000secなど)？ or Expireする時刻(Unix epochなど)？
-// 時刻の方が使いやすいか？期間だと開始時刻が必要になるので。
-var AUTHORIZE_TTL = 1000000; //sec? とりあえずなにか値を設定しておくだけ
-
-// =========================
-// == Publish test-ui.html ==
-// =========================
-var fs = require('fs');
-var httpsvr = require('http').createServer(function(req, res) {
-  var output;
-  console.log("httpsvr: req.url = "+req.url);
-  switch (req.url) {
-    case '/vss.json':
-      output = fs.readFileSync("./vss.json", "utf-8");
-      res.writeHead(200, {"Content-Type":"application/json"});
-      break;
-    default:
-      output = fs.readFileSync("./test-ui.html", "utf-8");
-      res.writeHead(200, {"Content-Type":"text/html"});
-      break;
-  }
-  res.end(output);
-}).listen(HTTP_SVR_PORT);
+// TODO: TTL value is period?(e.g. 1000sec) or clock time(e.g. 2017/02/07-15:43:00.000)
+// May be clock time is easy to use. If period, need to memorize start time.
+var AUTHORIZE_TTL = 1000000; //sec? dummy value for now
 
 // ===========================
 // == Start WebSocketServer ==
 // ===========================
 var WebSocketServer = require('ws').Server;
 var wssvr = new WebSocketServer({
-  host : VSSS_IP,
-  port : VSSS_PORT
+  host : VISS_IP,
+  port : VISS_PORT
 });
 
 // =========================================
@@ -185,7 +150,6 @@ var g_extMockDataSrc = (function() {
     //send set request to mockDataSrc
     sendSetRequest: function(obj, _reqId, _sessId) {
       if (m_conn != null) {
-        //console.log("sendSetRequest: ");
         var dataSrcReqId = this.createDataSrcReqId();
         var sendObj = this.createExtMockSvrSetRequestJson(obj, dataSrcReqId);
         this.addDataSrcReqHash(dataSrcReqId, _reqId, _sessId);
@@ -196,7 +160,6 @@ var g_extMockDataSrc = (function() {
     //send VSS json(full) request to mockDataSrc
     sendVssRequest: function(obj, _reqId, _sessId) {
       if (m_conn != null) {
-        //console.log("sendSetRequest: ");
         var dataSrcReqId = this.createDataSrcReqId();
         var sendObj = this.createExtMockSvrVssRequestJson(obj, dataSrcReqId);
         this.addDataSrcReqHash(dataSrcReqId, _reqId, _sessId);
@@ -211,14 +174,12 @@ var g_extMockDataSrc = (function() {
     },
 
     createExtMockSvrSetRequestJson: function(_obj, _dataSrcReqId) {
-      //console.log("createExtMockSvrSetRequestJson");
       var retObj = {"action": "set", "path": _obj.path, "value": _obj.value,
                     "dataSrcRequestId":_dataSrcReqId};
       return retObj;
     },
     createExtMockSvrVssRequestJson: function(_obj, _dataSrcReqId) {
-      //console.log("createExtMockSvrSetRequestJson");
-      // full VSS jsonを要求するのでpathは不要
+      // TODO: need to specify path
       var retObj = {"action": "getVSS",
                     //"path": _obj.path,
                     "dataSrcRequestId":_dataSrcReqId};
@@ -237,8 +198,6 @@ var g_extMockDataSrc = (function() {
     getReqIdSessIdObj: function(_dataSrcReqId) {
       return dataSrcReqHash[_dataSrcReqId];
     }
-
-
   }
   return obj;
 })();
@@ -264,8 +223,6 @@ var g_extSIPDataSrc = {
   // TODO: re-write in better way
   // (first version is ad-hoc lazy implementation)
   convertFormatFromSIPToVSS: function(sipData) {
-    //console.log("convertFormatFromSIPToVSS: sipData = " + sipData);
-    //console.log("convertFormatFromSIPToVSS: ");
     var vssData;
     var sipObj;
     try {
@@ -293,8 +250,6 @@ var g_extSIPDataSrc = {
       vssObj.push(obj);
     }
     if (engineSpeed != undefined) {
-      //console.log("  :engineSpeed.value=" + engineSpeed.value);
-      //console.log("  :engineSpeed.timestamp=" + engineSpeed.timestamp);
       var obj =
       { "path": "Signal.Drivetrain.InternalCombustionEngine.RPM",
         "value": engineSpeed.value,
@@ -302,8 +257,6 @@ var g_extSIPDataSrc = {
       vssObj.push(obj);
     }
     if (steeringWheel != undefined) {
-      //console.log("  :steeringWheel.value=" + steeringWheel.value);
-      //console.log("  :steeringWheel.timestamp=" + steeringWheel.timestamp);
       var obj =
       { "path": "Signal.Chassis.SteeringWheel.Angle",
         "value": steeringWheel.value,
@@ -312,7 +265,6 @@ var g_extSIPDataSrc = {
     }
     if (vssObj.length > 1) {
       var obj = {"data": vssObj};
-      //var vssStr = JSON.stringify(vssObj);
       var vssStr = JSON.stringify(obj);
       return vssStr;
     } else {
@@ -320,7 +272,7 @@ var g_extSIPDataSrc = {
     }
   },
 
-  // SIP形式のJSONからpath指定で欲しい値を取り出す
+  // pick out an object from SIP formed JSON by specifing 'path'
   // return value format: {value, timestamp}
   getValueFromSIPObj: function(origObj, path) {
     var pathElem = path.split(".");
@@ -348,10 +300,8 @@ if (dataSrc === EXT_SIP_SERVER) {
 
   if (sioClient != undefined) {
     sioClient.on("vehicle data", function(sipData) {
-      //console.log("on.vehicle_data:");
       var vssData = g_extSIPDataSrc.convertFormatFromSIPToVSS(sipData);
       if (vssData != undefined) {
-        //console.log("  :vssData= "+ vssData);
         dataReceiveHandler(vssData);
       }
     });
@@ -364,19 +314,10 @@ if (dataSrc === EXT_SIP_SERVER) {
 }
 
 
-// =========================
-// == define RequestTable ==
-// =========================
-//TODO:
-// - wsは複数同時接続される
-// - g_ws一つでなく、接続毎に新しい ws ができ、配列などに保存しておく
-// - WebSocket Close時には、対応するwsを削除する
-// - 念のため、接続毎に sessionID を持たせておく
-// - reqTable は WebSocket接続のセッション毎に別個にする
-
 // =============================
 // == session Hash definition ==
 // =============================
+// A websocket connection is a 'session'
 var g_sessionHash = {};
 var g_sessID_count = 0; // no need to be unique string.
 function createNewSessID() {
@@ -418,8 +359,6 @@ ReqTable.prototype.addReqToTable = function(reqObj, subId, timerId) {
   }
 
   console.log("  :EntryNum=" + Object.keys(this.requestHash).length);
-  //this.dispReqIdHash();
-
   return true;
 }
 ReqTable.prototype.delReqByReqId = function(reqId) {
@@ -519,7 +458,7 @@ wssvr.on('connection', function(ws) {
       var value = obj.value;
       var ret = _reqTable.addReqToTable(obj, null, null);
 
-      // とりあえずはextMockDataSrcの場合だけ考える
+      // TODO: for now support extMockDataSrc only. support other dataSrc when needed.
       g_extMockDataSrc.sendSetRequest(obj, reqId, _sessId);
 
     } else if (obj.action === "authorize") {
@@ -535,13 +474,12 @@ wssvr.on('connection', function(ws) {
         resObj = createAuthorizeErrorResponse(reqId, err);
       }
       ws.send(JSON.stringify(resObj));
-      // TODO: AuthorizeのTTLのexpire はどのように実現する？
+      // TODO: how to realize 'Authorize expiration'?
 
     } else if (obj.action === "getVSS") {
+      // - VSS json is retrieved from dataSrc
       // TODO:
-      // - VSS json は dataSrcからもらう
-      // - 指定path以下のVSSツリー抽出は、VSSSでやるか。(dataSrcに仕事をさせすぎない)
-      // VSS は VSSSが持っている？ or dataSrcが持っている？=> dataSrcが持つもの
+      // - how to extract sub-tree by 'path'? extract in VISS or dataSrc side?
       var reqId = obj.requestId;
       var path = obj.path;
       var ret = _reqTable.addReqToTable(obj, null, null);
@@ -602,8 +540,6 @@ wssvr.on('connection', function(ws) {
 
 // Handle data received from data source
 function dataReceiveHandler(message) {
-  //console.log("dataReceiveHandler: ");
-  //console.log("  :message=" + message);
   var obj;
   try {
     obj = JSON.parse(message);
@@ -613,9 +549,9 @@ function dataReceiveHandler(message) {
     console.log("  :Error = "+e);
     return;
   }
-  var dataObj = obj.data; // dataSrcからpushされる通常のdata
-  var setObj = obj.set;   // dataSrcにset をrequestしたときのresponse
-  var vssObj = obj.vss;   // dataSrcへのVSS jsonのrequsestへのresponse
+  var dataObj = obj.data; // standard data pushed from dataSrc
+  var setObj = obj.set;   // response of set request
+  var vssObj = obj.vss;   // response of getVss request
   var resObj;
 
   var matchObj;
@@ -650,7 +586,7 @@ function dataReceiveHandler(message) {
         if (resObj.error != undefined) {
           retObj = createVssErrorResponse(_reqObj.requestId, resObj.error);
         } else {
-          //TODO:指定path以下のVSSを抜き出す
+          //TODO: need to extract subtree under 'path'
           var targetVss = extractTargetVss(resObj.vss, _reqObj.path);
           retObj = createVssSuccessResponse(_reqObj.requestId, targetVss);
         }
@@ -672,7 +608,8 @@ function dataReceiveHandler(message) {
       _reqTable.delReqByReqId(_reqObj.requestId);
 
     } while(false);
-  // 通常のpush データへの対応
+
+  // handle standard pushed data
   // handler for 'data' notification from data source
   // handle 'get' and 'subscribe' at here
   } else if (dataObj != undefined) {
@@ -709,7 +646,6 @@ function dataReceiveHandler(message) {
                         reqObj.action, reqObj.path, matchObj.value, matchObj.timestamp);
             if (_ws != null)
               _ws.send(JSON.stringify(retObj));
-          //} else if (reqObj.action === "authorize") {
           } else {
             // nothing to do
           }
@@ -808,24 +744,20 @@ function createUnsubscribeErrorResponse(action, reqId, subId, error, timestamp) 
 }
 
 function createSetSuccessResponse(reqId, timestamp) {
-  //console.log("createSetSuccessResponse");
   var retObj = {"action": "set", "requestId":reqId, "timestamp":timestamp};
   return retObj;
 }
 function createSetErrorResponse(reqId, error, timestamp) {
-  //console.log("createSetErrorResponse");
   var retObj = {"action": "set", "requestId":reqId, "error":error, "timestamp":timestamp};
   return retObj;
 }
 
 // == getVSS ==
 function createVssSuccessResponse(reqId, vss) {
-  //console.log("createVssSuccessResponse");
   var retObj = {"action": "getVSS", "requestId":reqId, "vss":vss};
   return retObj;
 }
 function createVssErrorResponse(reqId, error, timestamp) {
-  //console.log("createVssErrorResponse");
   var retObj = {"action": "getVSS", "requestId":reqId, "error":error};
   return retObj;
 }

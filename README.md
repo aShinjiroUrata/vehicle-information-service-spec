@@ -6,33 +6,28 @@ Vehicle Signal Server Specification prototype implementation
 
 Tested with:
 * node v4.5.0  / npm 2.15.9
-* node v0.12.9 / npm 2.14.9
 
 To use:
 
-1.Install packages
-- $npm install fs http ws websocket socket.io socket.io-client
+1.Install npm packages
+- $npm install fs http ws websocket socket.io socket.io-client http-server
+-  or just
+- $npm install
 
-2.Edit Vsss.js code
-- Vsss.js is prototype implementation of VSSS server
-- edit Vsss's IP address by change VsssIP value.(change port if you like)
-- select data source to connect
-  - LOCAL_MOCK_DATA : to use hard coded data source driven by timer
-  - EXT_MOCK_SERVER : to use external websocket mock server 'mockDataSrc.js'
-  - EXT_SIP_SERVER  : to use websocket server which hosts actual vehicle data
-                      developed for SIP hackathon.
+2.Edit svr_config.js
+- update VISS_IP with your server's IP
+- update VISS_PORT with port no you want to use
+- VISS's websocket server opens with this IP and port
+  #do not used following port since they are already used.
+   3001: mockDataSrc.js
+   8000: simple web server
 
-3.If EXT_MOCK_SERVER data source is selected, start external mock data source
-- edit IP, port in mockDataSrc.js to match with Vsss.js
-- $node mockDataSrc.js
+3. start VISS server, mock data source server, simple web server
+- #web server is opened with port:8000.
+- $./start.sh
 
-4.If EXT_SIP_SERVER data source is selected, start SIP hackathon server
-- Open SIP hackathon server app by google chrome (#URL is not public)
-- enter roomID='room01' and submit
-- select drive data and start to play the data
+6.Open client app by browser via url= http://{VISS_IP}:8000
 
-5.Start Vehicle Signal Server
-- $node Vsss.js
+7. stop VISS server, mock data source server, simple web server
+- $./stop.sh
 
-6.Open client app by browser via url= http://{VsssIP}:{HttpSvrPort}
-  e.g. http://xx.xx.xx.xx:3000/

@@ -1,5 +1,6 @@
+<!DOCTYPE html>
 <!-- test-ui.html  -->
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>VSSS test UI</title>
@@ -36,6 +37,7 @@
     #server_info {height:20px; width:500px; font-size:13px;}
     #span_path {height:20px; width:20px; font-size:13px;}
   </style>
+  <script src="./svr_config.js"></script>
 </head>
 
 <body>
@@ -110,12 +112,9 @@
     </div>
   </div>
 
-  <script type="text/javascript">
-  var WSSvrIP = "10.5.162.79"; //VSSS's host IP
-  var WSSvrPort = "3000";
+  <script>
 
   var VSS_FILENAME = "vss.json";
-
   var g_vehicle = null; // only one WebSocket connection is allowed
   var g_reqTable = null;
   var g_vssObj = null; // VSS object loaded from vss.json
@@ -123,9 +122,9 @@
     speedReqId : null,
     engineRpmReqId : null,
     steerAngleReqId : null,
-    vssSubscribeReqId : [], //vssƒAƒCƒeƒ€subscribe‚ÉApath:reqId ‚Ìhash‚ğŠi”[
+    vssSubscribeReqId : [], //vssã‚¢ã‚¤ãƒ†ãƒ subscribeæ™‚ã«ã€path:reqId ã®hashã‚’æ ¼ç´
 
-    //2d‚Ìsubscribe‹Ö~‚Ì‚½‚ßƒ{ƒ^ƒ“‚ğlock‚µ‚Ä‚¢‚é
+    // lock buttons to avoid subscribing a data twice
     clearSubscribeBtnLock : function(reqId) {
       if (reqId == this.speedReqId) {
         this.speedReqId = null;
@@ -152,10 +151,10 @@
   // =========================
   // memo: all requests should be stored in this table
   g_reqTable = {
-    subIdHash: {},    // reqId:subId ‚ÌƒZƒbƒg‚ğ“o˜^
-    requestHash: {},  // reqId:reqObj ‚ÌƒZƒbƒg‚ğ“o˜^
+    subIdHash: {},    // store 'reqId:subId'
+    requestHash: {},  // store 'reqId:reqObj'
 
-    // reqId:reqObj‚ğreqHash‚É’Ç‰Á
+    // add 'reqId:reqObj' into requestHash
     addReqByReqId: function(reqId, reqItem) {
       showInMsgArea("addReqByReqId: reqId="+reqId);
       if (this.requestHash[reqId] != undefined) {
@@ -167,7 +166,7 @@
       return true;
     },
 
-    // reqId:reqObj ‚ğ reqHash‚©‚çíœBsubHash‚É‚à“o˜^‚ª‚ ‚ê‚Îíœ
+    // delete 'reqId:reqObj' from requestHash. delete from subIdHash too if exists
     delReqByReqId: function(reqId) {
       showInMsgArea("delReqByReqId: reqId="+reqId);
       if (this.requestHash[reqId] == undefined)
@@ -175,30 +174,28 @@
       var subId = this.requestHash[reqId].subscriptionId;
       delete this.requestHash[reqId];
 
-      // request‚ÍsubId‚ğ‚½‚È‚¢ê‡‚à‚ ‚é
-      // TODO: unsubscribe‚ÌƒGƒ“ƒgƒŠ‚ÍsubIdHash‚É‚Í“o˜^‚µ‚È‚¢
+      // requestã¯subIdã‚’æŒãŸãªã„å ´åˆã‚‚ã‚ã‚‹
+      // TODO: unsubscribeã®ã‚¨ãƒ³ãƒˆãƒªã¯subIdHashã«ã¯ç™»éŒ²ã—ãªã„
       if (subId != undefined)
         delete this.subIdHash[subId];
       showInMsgArea("--:entry deleted. reqId="+reqId+" ,subId="+subId);
       return true;
     },
 
-    // reqId‚©‚çreqObj‚ğæ“¾‚·‚é
+    // get reques object via requestId
     getReqByReqId: function(reqId) {
-      //showInMsgArea("getReqByReqId: reqId="+reqId);
       if (this.requestHash[reqId] == undefined) return false;
       return this.requestHash[reqId];
     },
 
-    // subId‚©‚çreqObj‚ğæ“¾‚·‚é
+    // get request object via subscribe Id
     getReqBySubId: function(subId) {
-      //showInMsgArea("getReqBySubId: subId="+subId);
       var reqId = this.subIdHash[subId];
       if (reqId == undefined) return false;
       return this.getReqByReqId(reqId);
     },
 
-    //requestHash‚É“o˜^Ï‚İ‚Ì reqId:reqObj ‚ÉA‘Î‰‚·‚ésubscriptionId‚ğ’Ç‰Á‚·‚é
+    //add subscriptionId to a 'reqId:reqObj' in requestHash
     setSubIdToReq: function(reqId, subId) {
       showInMsgArea("setSubIdToReq: reqId="+reqId+" subId="+subId);
       // this func is only for 'subscribe' request.
@@ -213,24 +210,22 @@
         return false;
       }
       this.requestHash[reqId].subscriptionId = subId;
-      //this.dispRequestHash();
       this.subIdHash[subId] = reqId; // for cross reference.
-      //this.dispSubIdHash();
       return true;
     },
-    // reqId‚©‚ç‘Î‰‚·‚ésubId‚ğæ“¾‚·‚é
+    // get subscription Id via corresponding request Id
     getSubIdByReqId: function(rId) {
       var obj = this.requestHash[rId];
       if (obj == undefined) return null;
       return obj.subscriptionId;
     },
-    // subId‚©‚ç‘Î‰‚·‚éreqId‚ğæ“¾‚·‚é
+    // get request Id from corresponding subscription Id
     getReqIdBySubId: function(sId) {
-      var reqId = this.subIdHash[sId]; //subIdHash ‚Íƒ_ƒuƒŠ‚È‚Ç‚È‚¢‚Í‚¸
+      var reqId = this.subIdHash[sId]; //subIdHash ã¯ãƒ€ãƒ–ãƒªãªã©ãªã„ã¯ãš
       if (reqId == undefined) return null;
       return reqId;
     },
-    // reqTable‚ğƒNƒŠƒA‚·‚é
+    // clear requestHash
     clearReqTable: function() {
       showInMsgArea("clearReqTable:");
       for (var i in this.requestHash) {
@@ -268,7 +263,6 @@
   }
 
   function onWsMessage(event) {
-    //showInMsgArea("onWsMessage: ");
     showInMsgArea("--: <== " + event.data.substr(0,3000));
 
     var msg;
@@ -284,13 +278,12 @@
       reqTableItem = g_reqTable.getReqByReqId(reqId);
       reqObj = reqTableItem.reqObj;
     } else if (msg.subscriptionId != undefined) { 
-      //reqId‚È‚µAsubId‚ ‚èsubscribe notification ‚Ìê‡
+      //reqIdãªã—ã€subIdã‚ã‚Šï¼subscribe notification ã®å ´åˆ
       subId = msg.subscriptionId;
       reqTableItem = g_reqTable.getReqBySubId(subId);
       reqObj = reqTableItem.reqObj;
     }
     action = reqObj.action;
-    //showInMsgArea("--:action="+action);
 
     // case of 'get'
     if (action === "get") {
@@ -307,21 +300,11 @@
 
     // case of 'subscribe'
     } else if (action === "subscribe") {
-      // memo: subscribe‚Ìincomming msg‚Íresponse‚©notification
-      //       response => reqId, subId—¼•û‚ ‚è
-      //       notifica => subId‚Ì‚İ‚ ‚è
-      //       subscribe‚ÌrequestHashƒGƒ“ƒgƒŠ‚Ìíœ‚Íunsubscribe‚É‚æ‚é
 
       if (isSubscribeSuccessResponse(msg)) {
-        // case of 'subscribeSuccessResponse'
-        // add subId to requestTable
-        //showInMsgArea("--:msgtype: SubscribeSuccessResponse");
         g_reqTable.setSubIdToReq(msg.requestId, msg.subscriptionId);
 
       } else if (isSubscribeErrorResponse(msg)) {
-        // case of 'subscribeErrorResponse'
-        // delete entry from requestTable
-        //showInMsgArea("--:msgtype: SubscribeErrorResponse");
         g_reqTable.delReqByReqId(msg.requestId);
 
       } else if (isSubscriptionNotification(msg)) {
@@ -332,11 +315,9 @@
           showGetResMsg(msg.value, reqTableItem.dispId)
 
       } else if (isSubscriptionNotificationError(msg)) {
-        //showInMsgArea("--:msgtype: SubscriptionNotificationError");
         // noting to do special here. continu subscribe.
       } else {
         //no one come here
-        //showInMsgArea("--:msgtype: Subscribe: Unknown");
       }
 
     // case of 'unsubscribe'
@@ -351,11 +332,11 @@
         // - delete subscribe request from requestTable
         // - delete unsubscribe request from requestTable
         var reqId = msg.requestId;
-        var targ_subId = msg.subscriptionId; //unsub‘ÎÛ‚Ìsubscribe‚ÌsubId
-        var targ_reqId = g_reqTable.getReqIdBySubId(targ_subId); //subscribe‚ÌreqId
+        var targ_subId = msg.subscriptionId; //unsubå¯¾è±¡ã®subscribeã®subId
+        var targ_reqId = g_reqTable.getReqIdBySubId(targ_subId); //subscribeã®reqId
 
-        g_reqTable.delReqByReqId(targ_reqId); //subscribe‚ÌƒGƒ“ƒgƒŠ‚ğíœ
-        g_reqTable.delReqByReqId(reqId);      //unsub‚ÌƒGƒ“ƒgƒŠ‚ğíœ
+        g_reqTable.delReqByReqId(targ_reqId); //subscribeã®ã‚¨ãƒ³ãƒˆãƒªã‚’å‰Šé™¤
+        g_reqTable.delReqByReqId(reqId);      //unsubã®ã‚¨ãƒ³ãƒˆãƒªã‚’å‰Šé™¤
 
         // clear flag for button lock
         g_ui.clearSubscribeBtnLock(targ_reqId);
@@ -391,7 +372,7 @@
       showInMsgArea("--:WebSocket already open");
       return;
     }
-    var url = "ws://" + WSSvrIP + ":" + WSSvrPort;
+    var url = "ws://" + VISS_IP + ":" + VISS_PORT;
     g_vehicle = new WebSocket(url);
     g_vehicle.onopen = onWsOpen;
     g_vehicle.onclose = onWsClose;
@@ -412,7 +393,8 @@
 
   // === authorize ===
   // TODO:
-  // ‚Æ‚è‚ ‚¦‚¸‚Íƒ_ƒ~[‚Ìƒg[ƒNƒ“‚Å‚æ‚¢‚©BB
+  // in 1st version, realize json msg exchange.
+  // use dummy token for now.
   var dummyToken_user   = "aaaaa";
   var dummyToken_device = "bbbbb";
   function wsAuthorize(_userToken, _deviceToken) {
@@ -455,11 +437,10 @@
 
   // === get ===
   function wsGetItem(_path, _dispId) {
-    //showInMsgArea("wsGetItem:");
     if (g_vehicle != null && g_vehicle.readyState === 1) {
       var reqId = getUniqueReqId();
       var req = {"action": "get", "path": _path, "requestId":reqId};
-      var item = {"reqObj": req, "dispId": _dispId}; //–ß‚è’l‚Ì•\¦æID‚ğ’Ç‰Á
+      var item = {"reqObj": req, "dispId": _dispId}; //æˆ»ã‚Šå€¤ã®è¡¨ç¤ºå…ˆIDã‚’è¿½åŠ 
       g_reqTable.addReqByReqId(reqId, item);
       var json_str = JSON.stringify(req);
       g_vehicle.send(json_str);
@@ -477,13 +458,13 @@
   }
 
   // === set ===
-  // set ‚É‚ÍdispId‚Í•s—v‚©‚àBB
+  // in case of 'set', dispId may not needed..
   function wsSetItem(path,value, _dispId) {
     showInMsgArea("wsSetItem:");
     if (g_vehicle != null && g_vehicle.readyState === 1) {
       var reqId = getUniqueReqId();
       var req = {"action": "set", "path": path, "value": value, "requestId":reqId};
-      var item = {"reqObj": req, "dispId": _dispId}; //–ß‚è’l‚Ì•\¦æID‚ğ’Ç‰Á
+      var item = {"reqObj": req, "dispId": _dispId}; //æˆ»ã‚Šå€¤ã®è¡¨ç¤ºå…ˆIDã‚’è¿½åŠ 
       g_reqTable.addReqByReqId(reqId, item);
       var json_str = JSON.stringify(req);
       g_vehicle.send(json_str);
@@ -492,7 +473,6 @@
   }
   function btnSetDoorRow1RightLock() {
     var value = document.getElementById("txt_set_doorRow1RightLock").value;
-    //showInMsgArea("btnSetDoorRow1RightLock=" + value);
     wsSetItem("Signal.Cabin.Door.Row1.Right.IsLocked", value, "txt_set_doorRow1RightLock");
   }
   function btnGetDoorRow1RightLock() {
@@ -512,7 +492,7 @@
     showInMsgArea("wsSubscribeItem: reqId = " + reqId);
     if (g_vehicle != null && g_vehicle.readyState === 1) {
       var req ={"action": "subscribe", "path": path, "filters":"", "requestId":reqId};
-      var item = {"reqObj": req, "dispId": _dispId}; //–ß‚è’l‚Ì•\¦æID‚ğ’Ç‰Á
+      var item = {"reqObj": req, "dispId": _dispId}; //æˆ»ã‚Šå€¤ã®è¡¨ç¤ºå…ˆIDã‚’è¿½åŠ 
       g_reqTable.addReqByReqId(reqId, item);
       var json_str = JSON.stringify(req);
       g_vehicle.send(json_str);
@@ -525,9 +505,9 @@
   function wsUnsubscribeItem(path, subId, _dispId) {
     showInMsgArea("wsUnsubscribeItem: subId=" + subId);
     if (g_vehicle != null && g_vehicle.readyState === 1) {
-      var reqId = getUniqueReqId(); //reqId‚Íunsub—p‚ÉV‚µ‚¢‚à‚Ì‚ğg—p
+      var reqId = getUniqueReqId(); //reqIdã¯unsubç”¨ã«æ–°ã—ã„ã‚‚ã®ã‚’ä½¿ç”¨
       var req = {"action": "unsubscribe", "requestId":reqId, "subscriptionId":subId};
-      var item = {"reqObj": req, "dispId": _dispId}; //–ß‚è’l‚Ì•\¦æID‚ğ’Ç‰Á
+      var item = {"reqObj": req, "dispId": _dispId}; //æˆ»ã‚Šå€¤ã®è¡¨ç¤ºå…ˆIDã‚’è¿½åŠ 
       g_reqTable.addReqByReqId(reqId, item);
       var json_str = JSON.stringify(req);
       g_vehicle.send(json_str);
@@ -547,7 +527,7 @@
   }
   function btnUnsubscribeSpeed() {
     var path = "Signal.Drivetrain.Transmission.Speed";
-    var targ_subId = g_reqTable.getSubIdByReqId(g_ui.speedReqId); //unsub‘ÎÛ‚ÌsubId‚ğæ“¾
+    var targ_subId = g_reqTable.getSubIdByReqId(g_ui.speedReqId); //unsubå¯¾è±¡ã®subIdã‚’å–å¾—
     wsUnsubscribeItem(path, targ_subId, "msg_sub_speed");
   }
 
@@ -656,6 +636,7 @@
 
   // == subscribe helper funcs ==
   // Judge returned Json message's type
+  // TODO: better to verify with json shema?
   function isSubscribeSuccessResponse(msg) {
     // This is subscribeSuccessResponse if ...
     // must exist    : (action), requestId, subscriptionId, (timestamp)
@@ -786,14 +767,14 @@
 
     return pathArry;
 
-    // traverse‚µ‚Äleaf‚É“’B‚µ‚½‚çs‚¤ˆ—
+    // traverseã—ã¦leafã«åˆ°é”ã—ãŸã‚‰è¡Œã†å‡¦ç†
     function leafCallback(_key, _node, _path) {
       var item = {'path':_path, 'node':_node};
       pathArry.push(item);
     }
   }
 
-  // VSS object ‚Ì tree ‚ğ‚È‚ß‚é“®ì
+  // function for traversing VSS object tree
   function traverse(_key, _node, _path, _leafCallback, _depth) {
     var depth = _depth+1;
     var path = _path=='' ? _key : _path+'.'+_key;
@@ -805,7 +786,7 @@
       //console.log( Array(depth+1).join('    ')+"branch:" + _key);
       //branch case
       if (_node.children) {
-        // childrenˆÈ‰º‚Ì—v‘f‚É‚Â‚¢‚Ätraverse‚ğs‚¤
+        // childrenä»¥ä¸‹ã®è¦ç´ ã«ã¤ã„ã¦traverseã‚’è¡Œã†
         Object.keys(_node.children).forEach(function(key) {
             var node = _node.children[key];
             traverse(key, node, path, _leafCallback, depth);
@@ -830,7 +811,7 @@
       if (obj[pathArry[i]] != undefined) {
         obj = obj[pathArry[i]];
       } else {
-        //‘¶İ‚µ‚È‚¢ƒpƒX
+        // this case should not exist
         return undefined;
       }
     }
@@ -842,7 +823,7 @@
   // =============
   (function init() {
     var svr_area = document.getElementById("server_info");
-    svr_area.innerHTML = "Server IP:" + WSSvrIP + "  WebSocket Port:" + WSSvrPort;
+    svr_area.innerHTML = "Server IP:" + VISS_IP + "  WebSocket Port:" + VISS_PORT;
 
     var msg_areas = document.getElementsByClassName("val_area");
     for (var i=0; i<msg_areas.length; i++) {
