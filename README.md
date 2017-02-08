@@ -13,20 +13,22 @@ To use:
 - $npm install fs http ws websocket socket.io socket.io-client http-server
 -  or just
 - $npm install
+-  install http-server in global
+- $npm install -g http-server
 
 2.Edit svr_config.js
 - update VISS_IP with your server's IP
 - update VISS_PORT with port no you want to use
 - VISS's websocket server opens with this IP and port
-  #do not used following port since they are already used.
+  #following ports are already in use. please select another port no
    3001: mockDataSrc.js
    8000: simple web server
 
-3. start VISS server, mock data source server, simple web server
-- #web server is opened with port:8000.
+3. start VISS server
 - $./start.sh
+- #script starts mock data source server, VIS Server, simple web server
 
-6.Open client app by browser via url= http://{VISS_IP}:8000
+6.Open test-ui app by browser via url= http://{VISS_IP}:8000/test-ui.html
 
 7. stop VISS server, mock data source server, simple web server
 - $./stop.sh
