@@ -1,3 +1,5 @@
+// Copyright (c) 2017 ACCESS CO., LTD. All rights reserved.
+//
 // mockDataSrc.js
 // * This is data source WebSocket Server
 // * to be used as replacemnt of actual vehicle.

@@ -1,3 +1,4 @@
+// Copyright (c) 2017 ACCESS CO., LTD. All rights reserved.
 //
 // Vehicle Information Server prototype implementation
 //
