@@ -26,6 +26,12 @@ var EXT_SIP_SERVER = 2;
 var dataSrc = EXT_MOCK_SERVER;
 //var dataSrc = EXT_SIP_SERVER;
 
+// == log level ==
+var LOG_QUIET = 0
+var LOG_DEFAULT = 1
+var LOG_VERBOSE = 2;
+var LOG_CUR_LEVEL = LOG_DEFAULT;
+
 // == Error value definition ==
 // TODO: add more
 var ERR_SUCCESS = 'success';
@@ -131,14 +137,14 @@ var g_extMockDataSrc = (function() {
 
     connectHandler:  function(conn) {
       m_conn = conn;
-      console.log('connectHandler: ');
-      console.log('  :Connected to DataSrc');
+      printLog(LOG_DEFAULT, 'connectHandler: ');
+      printLog(LOG_DEFAULT,'  :Connected to DataSrc');
 
       conn.on('error', function(err) {
-        console.log("  :dataSrc on error ");
+        printLog(LOG_QUIET,"  :dataSrc on error ");
       });
       conn.on('close', function() {
-        console.log("  :dataSrc on close ");
+        printLog(LOG_QUIET,"  :dataSrc on close ");
         m_conn = null;
       });
       conn.on('message', function(msg) {
@@ -154,7 +160,7 @@ var g_extMockDataSrc = (function() {
         var dataSrcReqId = this.createDataSrcReqId();
         var sendObj = this.createExtMockSvrSetRequestJson(obj, dataSrcReqId);
         this.addDataSrcReqHash(dataSrcReqId, _reqId, _sessId);
-        //console.log("  :sendObj="+JSON.stringify(sendObj));
+        //printLog(LOG_DEFAULT,"  :sendObj="+JSON.stringify(sendObj));
         m_conn.sendUTF(JSON.stringify(sendObj));
       }
     },
@@ -164,7 +170,7 @@ var g_extMockDataSrc = (function() {
         var dataSrcReqId = this.createDataSrcReqId();
         var sendObj = this.createExtMockSvrVssRequestJson(obj, dataSrcReqId);
         this.addDataSrcReqHash(dataSrcReqId, _reqId, _sessId);
-        //console.log("  :sendObj="+JSON.stringify(sendObj));
+        //printLog(LOG_DEFAULT,"  :sendObj="+JSON.stringify(sendObj));
         m_conn.sendUTF(JSON.stringify(sendObj));
       }
     },
@@ -189,7 +195,7 @@ var g_extMockDataSrc = (function() {
 
     addDataSrcReqHash: function(_dataSrcReqId, _reqId, _sessId) {
       dataSrcReqHash[_dataSrcReqId] = {'requestId':_reqId, 'sessionId':_sessId};
-      console.log("addDataSrcReqHash["+_dataSrcReqId+"] = "
+      printLog(LOG_VERBOSE,"addDataSrcReqHash["+_dataSrcReqId+"] = "
                   + JSON.stringify(dataSrcReqHash[_dataSrcReqId]));
     },
 
@@ -207,7 +213,7 @@ if (dataSrc === EXT_MOCK_SERVER) {
   var modWsClient= require('websocket').client;
   var wsClient = new modWsClient();
   wsClient.on('connect', g_extMockDataSrc.connectHandler);
-  console.log("g_extMockDataSrc.svrUrl= " + g_extMockDataSrc.svrUrl);
+  printLog(LOG_DEFAULT,"g_extMockDataSrc.svrUrl= " + g_extMockDataSrc.svrUrl);
   wsClient.connect(g_extMockDataSrc.svrUrl,'');
 }
 
@@ -230,8 +236,8 @@ var g_extSIPDataSrc = {
       sipObj = JSON.parse(sipData);
     } catch(e) {
       //iregurlar Json case
-      console.log("  :received irregular Json messaged. ignored.");
-      console.log("  :Error = "+e);
+      printLog(LOG_DEFAULT,"  :received irregular Json messaged. ignored.");
+      printLog(LOG_DEFAULT,"  :Error = "+e);
       return;
     }
     var vehicleSpeed = this.getValueFromSIPObj(sipObj,"Vehicle.RunningStatus.VehicleSpeed.speed");
@@ -242,8 +248,8 @@ var g_extSIPDataSrc = {
     // TODO: need brush up.
     var vssObj = new Array();
     if (vehicleSpeed != undefined) {
-      console.log("  :vehicleSpeed.value=" + vehicleSpeed.value);
-      console.log("  :vehicleSpeed.timestamp=" + vehicleSpeed.timestamp);
+      printLog(LOG_VERBOSE,"  :vehicleSpeed.value=" + vehicleSpeed.value);
+      printLog(LOG_VERBOSE,"  :vehicleSpeed.timestamp=" + vehicleSpeed.timestamp);
       var obj =
       { "path": "Signal.Drivetrain.Transmission.Speed",
         "value": vehicleSpeed.value,
@@ -307,7 +313,7 @@ if (dataSrc === EXT_SIP_SERVER) {
       }
     });
     sioClient.on('connect',function(){
-        console.log("on.connect");
+        printLog(LOG_QUIET,"on.connect");
         var msg = {"roomID":g_extSIPDataSrc.roomID, "data":"NOT REQUIRED"};
         sioClient.emit('joinRoom', JSON.stringify(msg));
     });
@@ -335,9 +341,9 @@ function ReqTable() {
 }
 ReqTable.prototype.addReqToTable = function(reqObj, subId, timerId) {
   var reqId = reqObj.requestId;
-  console.log("addReqToTable: reqId="+reqId);
+  printLog(LOG_VERBOSE,"addReqToTable: reqId="+reqId);
   if (this.requestHash[reqId] != undefined) {
-    console.log("  :Error: requestId already used. reqId="+reqId);
+    printLog(LOG_QUIET,"  :Error: requestId already used. reqId="+reqId);
     return false;
   }
   this.requestHash[reqId] = reqObj;
@@ -345,42 +351,42 @@ ReqTable.prototype.addReqToTable = function(reqObj, subId, timerId) {
   //subscribeの場合subIdHashにも登録する
   if (reqObj.action == "subscribe") {
     if (subId != undefined && this.subIdHash[subId] == undefined) {
-      console.log("  :action="+reqObj.action+". adding subId="+subId);
+      printLog(LOG_VERBOSE,"  :action="+reqObj.action+". adding subId="+subId);
       this.requestHash[reqId].subscriptionId = subId;
       this.subIdHash[subId] = reqId;
     } else {
-      console.log("  :action="+reqObj.action+". not adding subId="+subId);
+      printLog(LOG_VERBOSE,"  :action="+reqObj.action+". not adding subId="+subId);
     }
     // timerIdは、setIntervalでイベントを発生させるデモ実装の場合。
     // dataSrcからデータ通知を受ける場合はタイマは使わない
     if (timerId != undefined) {
-      console.log("  :action="+reqObj.action+". adding timerId="+subId);
+      printLog(LOG_VERBOSE,"  :action="+reqObj.action+". adding timerId="+subId);
       this.requestHash[reqId].timerId = timerId;
     }
   }
 
-  console.log("  :EntryNum=" + Object.keys(this.requestHash).length);
+  printLog(LOG_DEFAULT,"  :EntryNum=" + Object.keys(this.requestHash).length);
   return true;
 }
 ReqTable.prototype.delReqByReqId = function(reqId) {
-  console.log("delReqByReqId: reqId = " + reqId);
+  printLog(LOG_VERBOSE,"delReqByReqId: reqId = " + reqId);
   if (this.requestHash[reqId] == undefined) {
-    console.log("  :delReqByReqId: entry is not found. reqId = " + reqId);
+    printLog(LOG_VERBOSE,"  :delReqByReqId: entry is not found. reqId = " + reqId);
     return false;
   }
   var subId = this.requestHash[reqId].subscriptionId;
   delete this.requestHash[reqId];
   if (subId != undefined)
     delete this.subIdHash[subId];
-  console.log("  :EntryNum=" + Object.keys(this.requestHash).length);
+  printLog(LOG_DEFAULT,"  :EntryNum=" + Object.keys(this.requestHash).length);
   return true;
 }
 ReqTable.prototype.clearReqTable = function() {
-  console.log("clearReqTable");
+  printLog(LOG_DEFAULT,"clearReqTable");
 
   for (var rid in this.requestHash) {
     var obj = this.requestHash[rid];
-    console.log("  :reqId=" + obj.requestId + " , subId="+obj.subscriptionId+", path="
+    printLog(LOG_DEFAULT,"  :reqId=" + obj.requestId + " , subId="+obj.subscriptionId+", path="
                 +obj.path+", timerId="+obj.timerId);
     var timerId = obj.timerId;
     clearInterval(timerId);
@@ -403,20 +409,20 @@ ReqTable.prototype.getSubIdByReqId = function(reqId) {
   return obj.subscriptionId;
 }
 ReqTable.prototype.getTimerIdByReqId = function(reqId) {
-  console.log("getTimerIdByReqId: reqId="+reqId);
+  printLog(LOG_VERBOSE,"getTimerIdByReqId: reqId="+reqId);
   var obj = this.requestHash[reqId];
   if (obj == undefined) {
-    console.log("  :getTimerIdByReqId: object not found.");
+    printLog(LOG_VERBOSE,"  :getTimerIdByReqId: object not found.");
     return null;
   }
-  console.log("  :timerId = " + obj.timerId);
+  printLog(LOG_VERBOSE,"  :timerId = " + obj.timerId);
   return obj.timerId;
 }
 ReqTable.prototype.dispReqIdHash = function() {
-  console.log("dispReqIdHash:");
+  printLog(LOG_VERBOSE,"dispReqIdHash:");
   for (var rid in this.requestHash) {
     var obj = this.requestHash[rid];
-    console.log("  :reqid=" + obj.requestId + " , subid="+obj.subscriptionId
+    printLog(LOG_VERBOSE,"  :reqid=" + obj.requestId + " , subid="+obj.subscriptionId
                 +", path="+obj.path+", timerid="+obj.timerid);
   }
 }
@@ -425,6 +431,7 @@ wssvr.on('connection', function(ws) {
 
   var _sessId = createNewSessID();
   var _reqTable = new ReqTable();
+  printLog(LOG_DEFAULT,"  :ws.on:connection: sessId= " + _sessId);
 
   // store sessID, reqTable, ws in a global hash
   g_sessionHash[_sessId] = {'ws': ws, 'reqTable': _reqTable};
@@ -435,11 +442,11 @@ wssvr.on('connection', function(ws) {
     try {
       obj = JSON.parse(message);
     } catch (e) {
-      console.log("  :received irregular Json messaged. ignored.");
-      console.log("  :Error = "+e);
+      printLog(LOG_QUIET,"  :received irregular Json messaged. ignored.");
+      printLog(LOG_QUIET,"  :Error = "+e);
       return;
     }
-    console.log("ws.on:message: obj= " + message);
+    printLog(LOG_DEFAULT,"  :ws.on:message: obj= " + message);
 
     // NOTE: assuming 1 message contains only 1 method.
     // for 'get'
@@ -448,12 +455,12 @@ wssvr.on('connection', function(ws) {
       var path = obj.path;
       var ret = _reqTable.addReqToTable(obj, null, null);
       if (ret == false) {
-        console.log("  :Failed to add 'get' info to requestTable.");
+        printLog(LOG_QUIET,"  :Failed to add 'get' info to requestTable.");
       }
-      console.log("  :get request registered. reqId=" + reqId + ", path=" + path);
+      printLog(LOG_DEFAULT,"  :get request registered. reqId=" + reqId + ", path=" + path);
 
     } else if (obj.action === "set") {
-      //console.log("  :action=" + obj.action);
+      //printLog(LOG_DEFAULT,"  :action=" + obj.action);
       var reqId = obj.requestId;
       var path = obj.path;
       var value = obj.value;
@@ -461,7 +468,7 @@ wssvr.on('connection', function(ws) {
 
       // TODO: for now support extMockDataSrc only. support other dataSrc when needed.
       g_extMockDataSrc.sendSetRequest(obj, reqId, _sessId);
-
+      printLog(LOG_DEFAULT,"  :set request registered. reqId=" + reqId + ", path=" + path);
     } else if (obj.action === "authorize") {
       var reqId = obj.requestId;
       var token = obj.tokens;
@@ -469,14 +476,14 @@ wssvr.on('connection', function(ws) {
       var err = judgeAuthorizeToken(token);
       var resObj;
       if (err === ERR_SUCCESS) {
-        console.log("  :Failed to add subscribe info to IdTable. Cancel the timer.");
+        printLog(LOG_QUIET,"  :Failed to add subscribe info to IdTable. Cancel the timer.");
         resObj = createAuthorizeSuccessResponse(reqId, AUTHORIZE_TTL);
       } else {
         resObj = createAuthorizeErrorResponse(reqId, err);
       }
       ws.send(JSON.stringify(resObj));
       // TODO: how to realize 'Authorize expiration'?
-
+      printLog(LOG_DEFAULT,"  :authorize request registered. reqId=" + reqId + ", token=" + token);
     } else if (obj.action === "getVSS") {
       // - VSS json is retrieved from dataSrc
       // TODO:
@@ -485,7 +492,7 @@ wssvr.on('connection', function(ws) {
       var path = obj.path;
       var ret = _reqTable.addReqToTable(obj, null, null);
       g_extMockDataSrc.sendVssRequest(obj, reqId, _sessId);
-
+      printLog(LOG_DEFAULT,"  :getVss request registered. reqId=" + reqId + ", path=" + path);
     // for 'subscribe'
     } else if (obj.action === "subscribe") {
 
@@ -498,11 +505,11 @@ wssvr.on('connection', function(ws) {
       var ret = _reqTable.addReqToTable(obj, subId, null);
       var timestamp = new Date().getTime().toString(10);
       if (ret == false) {
-        console.log("  :Failed to add subscribe info to IdTable. Cancel the timer.");
+        printLog(LOG_QUIET,"  :Failed to add subscribe info to IdTable. Cancel the timer.");
         var error = -1; //TODO: select correct error code
         resObj = createSubscribeErrorResponse(action, reqId, path, error, timestamp);
       } else {
-        console.log("  :subscribe started. reqId=" + reqId + ", subId=" + subId + ", path=" + path);
+        printLog(LOG_DEFAULT, "  :subscribe started. reqId=" + reqId + ", subId=" + subId + ", path=" + path);
         resObj = createSubscribeSuccessResponse(action, reqId, subId, timestamp);
       }
       ws.send(JSON.stringify(resObj));
@@ -515,8 +522,10 @@ wssvr.on('connection', function(ws) {
       var ret = _reqTable.delReqByReqId(targ_reqId); // subscribeのentryを削除
       var timestamp = new Date().getTime().toString(10);
       if (ret == true) {
+        printLog(LOG_DEFAULT,"  :Success to unsubscribe with subId = " + targ_subId);
         resObj = createUnsubscribeSuccessResponse(obj.action, reqId, targ_subId, timestamp);
       } else {
+        printLog(LOG_QUIET,"  :Failed to unsubscribe with subId = " + targ_subId);
         var err = -1; //TODO: select correct error value
         resObj = createUnsubscribeErrorResponse(obj.action, reqId, targ_subId, err, timestamp);
       }
@@ -528,7 +537,7 @@ wssvr.on('connection', function(ws) {
   });
 
   ws.on('close', function() {
-    console.log('ws.on:closed');
+    printLog(LOG_QUIET,'ws.on:closed');
     _reqTable.clearReqTable();
 
     // delete a session
@@ -546,8 +555,8 @@ function dataReceiveHandler(message) {
     obj = JSON.parse(message);
   } catch(e) {
     //irregurlar Json case
-    console.log("  :received irregular Json messaged. ignored.");
-    console.log("  :Error = "+e);
+    printLog(LOG_QUIET,"  :received irregular Json messaged. ignored.");
+    printLog(LOG_QUIET,"  :Error = "+e);
     return;
   }
   var dataObj = obj.data; // standard data pushed from dataSrc
@@ -560,7 +569,7 @@ function dataReceiveHandler(message) {
 
   // if 'getVSS' or 'set' response exists..
   if (vssObj || setObj) {
-    //console.log("  :getVss message=" + JSON.stringify(vssObj).substr(0,200));
+    //printLog(LOG_DEFAULT,"  :getVss message=" + JSON.stringify(vssObj).substr(0,200));
     if (vssObj)
       resObj = vssObj;
     else
@@ -569,7 +578,7 @@ function dataReceiveHandler(message) {
     do { // for exitting by 'break'
       var _dataSrcReqId = resObj.dataSrcRequestId;
       var _reqIdsessIdObj = g_extMockDataSrc.getReqIdSessIdObj(_dataSrcReqId);
-      console.log("  :reqIdsessIdObj=" + JSON.stringify(_reqIdsessIdObj));
+      printLog(LOG_DEFAULT,"  :reqIdsessIdObj=" + JSON.stringify(_reqIdsessIdObj));
       if (_reqIdsessIdObj == undefined) {
         break;
       }
@@ -591,14 +600,14 @@ function dataReceiveHandler(message) {
           var targetVss = extractTargetVss(resObj.vss, _reqObj.path);
           retObj = createVssSuccessResponse(_reqObj.requestId, targetVss);
         }
-        console.log("  :getVss response="+JSON.stringify(retObj).substr(0,3000));
+        printLog(LOG_VERBOSE,"  :getVss response="+JSON.stringify(retObj).substr(0,3000));
       } else {
         if (resObj.error != undefined) {
           retObj = createSetErrorResponse(_reqObj.requestId, resObj.error, resObj.timestamp);
         } else {
           retObj = createSetSuccessResponse(_reqObj.requestId, resObj.timestamp);
         }
-        console.log("  :set response="+JSON.stringify(retObj));
+        printLog(LOG_VERBOSE,"  :set response="+JSON.stringify(retObj));
       }
 
       if (_ws != null) {
@@ -621,7 +630,7 @@ function dataReceiveHandler(message) {
       for (var i in _reqTable.requestHash) {
         reqObj = _reqTable.requestHash[i];
         if (reqObj.action != 'get' && reqObj.action != 'subscribe') {
-          console.log("  :skip data: action="+ reqObj.action);
+          printLog(LOG_VERBOSE,"  :skip data: action="+ reqObj.action);
           continue;
         }
         matchObj = null;
@@ -691,6 +700,26 @@ function getUniqueSubId() {
   var strength = 1000;
   var uniq = getSemiUniqueId();
   return "subid-"+uniq;
+}
+
+function getTimeString() {
+  var date = new Date();
+
+  var Y = date.getFullYear();
+  var Mon = ("00"+(date.getMonth()+1)).substr(-2);
+  var d = ("00"+date.getDate()).substr(-2);
+  var h = ("00"+date.getHours()).substr(-2);
+  var m = ("00"+date.getMinutes()).substr(-2);
+  var s = ("00"+date.getSeconds()).substr(-2);
+
+  var res = Y+"/"+Mon+"/"+d+"-"+h+":"+m+":"+s
+    return res;
+}
+
+function printLog(lvl, msg) {
+  if (lvl <= LOG_CUR_LEVEL) {
+    console.log(getTimeString() + ":" + msg);
+  }
 }
 
 // ==================

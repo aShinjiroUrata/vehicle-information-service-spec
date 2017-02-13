@@ -29,7 +29,7 @@ To use:
   (The script starts 'mock data source', 'VISServer', 'node's http-server'.<br>
    node's web server uses port:8000 by default.)
 
-4.Open test-ui app by browser with url = http://{VISS_IP}:8000/test-ui.html
+4.Open test-ui app by browser with url = http://{VISS_IP}:8081/test-ui.html
 
 5.stop VISS server, mock data source server, simple web server
 - `$./stop.sh`
