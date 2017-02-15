@@ -6,5 +6,7 @@ pgrep -f 'mockData' | xargs kill &
 
 echo -e "\n"
 
+sleep 1s
+
 ps aux | grep node &
 

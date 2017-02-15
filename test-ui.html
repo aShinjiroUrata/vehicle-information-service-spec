@@ -115,6 +115,7 @@
 
   <script>
 
+  var SUBPROTOCOL = "wvss1.0";
   var VSS_FILENAME = "vss.json";
   var g_vehicle = null; // only one WebSocket connection is allowed
   var g_reqTable = null;
@@ -374,7 +375,7 @@
       return;
     }
     var url = "ws://" + VISS_IP + ":" + VISS_PORT;
-    g_vehicle = new WebSocket(url);
+    g_vehicle = new WebSocket(url, SUBPROTOCOL);
     g_vehicle.onopen = onWsOpen;
     g_vehicle.onclose = onWsClose;
     g_vehicle.onmessage = onWsMessage;

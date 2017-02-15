@@ -1,16 +1,11 @@
 {
   "name": "vehicle-signal-server-spec",
   "version": "1.0.0",
-  "description": "w3c automotive vehicle signal erver specification prototype",
+  "description": "Vehicle Information Service Specification prototype implementation",
   "main": "Vsss.js",
   "dependencies": {
-    "ejs": "^2.5.5",
-    "should": "^11.2.0",
-    "websocket": "^1.0.24",
-    "express": "^4.14.1",
-    "socket.io": "^1.7.2",
-    "ws": "^1.1.1",
-    "socket.io-client": "^1.7.2"
+    "ws": "^2.0.3",
+    "websocket": "^1.0.24"
   },
   "author": "access"
 }

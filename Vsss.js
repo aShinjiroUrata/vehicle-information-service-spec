@@ -14,6 +14,7 @@
 var svr_config = require('./svr_config');
 var VISS_IP = svr_config.VISS_IP;
 var VISS_PORT = svr_config.VISS_PORT;
+var SUBPROTOCOL = "wvss1.0";
 var EXT_MOCKSVR_IP = '127.0.0.1';
 var EXT_MOCKSVR_PORT = 3001;
 
@@ -45,10 +46,19 @@ var AUTHORIZE_TTL = 1000000; //sec? dummy value for now
 // ===========================
 // == Start WebSocketServer ==
 // ===========================
+
+// for sub-protocol support
+function selectProtocols(protocols) {
+  printLog(LOG_DEFAULT, "  :incomming sub-protocol = " + protocols);
+  printLog(LOG_DEFAULT, "  :granting sub-protocol = " + SUBPROTOCOL);
+  return SUBPROTOCOL;
+};
+
 var WebSocketServer = require('ws').Server;
 var wssvr = new WebSocketServer({
   host : VISS_IP,
-  port : VISS_PORT
+  port : VISS_PORT,
+  handleProtocols : selectProtocols 
 });
 
 // =========================================
@@ -382,7 +392,7 @@ ReqTable.prototype.delReqByReqId = function(reqId) {
   return true;
 }
 ReqTable.prototype.clearReqTable = function() {
-  printLog(LOG_DEFAULT,"clearReqTable");
+  printLog(LOG_DEFAULT,"  :clearReqTable");
 
   for (var rid in this.requestHash) {
     var obj = this.requestHash[rid];
@@ -537,7 +547,7 @@ wssvr.on('connection', function(ws) {
   });
 
   ws.on('close', function() {
-    printLog(LOG_QUIET,'ws.on:closed');
+    printLog(LOG_QUIET,'  :ws.on:closed');
     _reqTable.clearReqTable();
 
     // delete a session
