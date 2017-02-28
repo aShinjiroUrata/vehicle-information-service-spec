@@ -452,7 +452,7 @@ wssvr.on('connection', function(ws) {
     try {
       obj = JSON.parse(message);
     } catch (e) {
-      printLog(LOG_QUIET,"  :received irregular Json messaged. ignored.");
+      printLog(LOG_QUIET,"  :received irregular Json messaged. ignored. msg = "+message);
       printLog(LOG_QUIET,"  :Error = "+e);
       return;
     }
