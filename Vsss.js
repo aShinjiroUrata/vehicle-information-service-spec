@@ -531,6 +531,7 @@ wssvr.on('connection', function(ws) {
       var resObj;
       var ret = _reqTable.delReqByReqId(targ_reqId); // subscribeのentryを削除
       var timestamp = new Date().getTime().toString(10);
+
       if (ret == true) {
         printLog(LOG_DEFAULT,"  :Success to unsubscribe with subId = " + targ_subId);
         resObj = createUnsubscribeSuccessResponse(obj.action, reqId, targ_subId, timestamp);
@@ -539,6 +540,18 @@ wssvr.on('connection', function(ws) {
         var err = -1; //TODO: select correct error value
         resObj = createUnsubscribeErrorResponse(obj.action, reqId, targ_subId, err, timestamp);
       }
+      ws.send(JSON.stringify(resObj));
+
+    } else if (obj.action === "unsubscribeAll") {
+      for (var i in _reqTable.subIdHash) {
+        var reqId = _reqTable.subIdHash[i];
+        delete _reqTable.requestHash[reqId];
+        delete _reqTable.subIdHash[i];
+      }
+      printLog(LOG_DEFAULT,"  :Success to unsubscribe all subscription.");
+
+      var timestamp = new Date().getTime().toString(10);
+      resObj = createUnsubscribeAllSuccessResponse(obj.action, obj.requestId, timestamp);
       ws.send(JSON.stringify(resObj));
 
     } else {
@@ -779,6 +792,19 @@ function createUnsubscribeSuccessResponse(action, reqId, subId, timestamp) {
 }
 function createUnsubscribeErrorResponse(action, reqId, subId, error, timestamp) {
   var retObj = {"action": action, "requestId":reqId, "subscriptionId":subId,
+                "error":error, "timestamp":timestamp};
+  return retObj;
+}
+
+function createUnsubscribeAllSuccessResponse(action, reqId, timestamp) {
+  var retObj = {"action": action, "requestId":reqId, 
+                "subscriptionId": null, // is this necessary?
+                "timestamp":timestamp};
+  return retObj;
+}
+function createUnsubscribeAllErrorResponse(action, reqId, error, timestamp) {
+  var retObj = {"action": action, "requestId":reqId,
+                "subscriptionId": null,
                 "error":error, "timestamp":timestamp};
   return retObj;
 }

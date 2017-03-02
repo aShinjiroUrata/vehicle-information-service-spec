@@ -88,6 +88,7 @@
       <br><button onclick="btnSubscribeSteerAngle();">subscribe steer angle</button>
       <button onclick="btnUnsubscribeSteerAngle();">unsubscribe</button>
       <span class="val_area" id="msg_sub_steer"></span>
+      <br><button onclick="btnUnsubscribeAll();">unsubscribeAll</button>
       <br>
 
       <!-- use VSS data -->
@@ -114,6 +115,12 @@
   </div>
 
   <script>
+
+  // WebSocket readyState
+  var WS_CONNECTING = 0;
+  var WS_OPEN       = 1;
+  var WS_CLOSING    = 2;
+  var WS_CLOSED     = 3;
 
   var SUBPROTOCOL = "wvss1.0";
   var VSS_FILENAME = "vss.json";
@@ -153,12 +160,12 @@
   // =========================
   // memo: all requests should be stored in this table
   g_reqTable = {
-    subIdHash: {},    // store 'reqId:subId'
-    requestHash: {},  // store 'reqId:reqObj'
+    subIdHash: {},    // store 'reqId:subId' for reqId : subId relation
+    requestHash: {},  // store 'reqId:reqObj' for reqId : reqObj relation
 
     // add 'reqId:reqObj' into requestHash
-    addReqByReqId: function(reqId, reqItem) {
-      showInMsgArea("addReqByReqId: reqId="+reqId);
+    addRequest: function(reqId, reqItem) {
+      showInMsgArea("addRequest: reqId="+reqId);
       if (this.requestHash[reqId] != undefined) {
         showInMsgArea("--:Error: requestId already used. reqId="+reqId);
         return false;
@@ -169,8 +176,8 @@
     },
 
     // delete 'reqId:reqObj' from requestHash. delete from subIdHash too if exists
-    delReqByReqId: function(reqId) {
-      showInMsgArea("delReqByReqId: reqId="+reqId);
+    deleteRequest: function(reqId) {
+      showInMsgArea("deleteRequest: reqId="+reqId);
       if (this.requestHash[reqId] == undefined)
         return false;
       var subId = this.requestHash[reqId].subscriptionId;
@@ -185,21 +192,21 @@
     },
 
     // get reques object via requestId
-    getReqByReqId: function(reqId) {
+    getRequest: function(reqId) {
       if (this.requestHash[reqId] == undefined) return false;
       return this.requestHash[reqId];
     },
 
     // get request object via subscribe Id
-    getReqBySubId: function(subId) {
+    getRequestBySubId: function(subId) {
       var reqId = this.subIdHash[subId];
       if (reqId == undefined) return false;
-      return this.getReqByReqId(reqId);
+      return this.getRequest(reqId);
     },
 
     //add subscriptionId to a 'reqId:reqObj' in requestHash
-    setSubIdToReq: function(reqId, subId) {
-      showInMsgArea("setSubIdToReq: reqId="+reqId+" subId="+subId);
+    addSubId: function(reqId, subId) {
+      showInMsgArea("addSubId: reqId="+reqId+" subId="+subId);
       // this func is only for 'subscribe' request.
       // should not be used for 'unsubscribe' request, otherwise
       // a subscriptionId may be used twice in hash array.
@@ -227,9 +234,22 @@
       if (reqId == undefined) return null;
       return reqId;
     },
+
+    // delete all subscribe entry
+    deleteAllSubscribe: function() {
+      for (var i in this.subIdHash) {
+        var reqId = this.subIdHash[i];
+
+        delete this.requestHash[reqId];
+        delete this.subIdHash[i];
+      }
+      this.dispSubIdHash();
+      this.dispRequestHash();
+    },
+
     // clear requestHash
-    clearReqTable: function() {
-      showInMsgArea("clearReqTable:");
+    clearAllRequest: function() {
+      showInMsgArea("clearAllRequest:");
       for (var i in this.requestHash) {
         showInMsgArea("--:delete : " + i);
         delete this.requestHash[i];
@@ -240,6 +260,8 @@
       }
       g_ui.clearSubscribeBtnLockAll();
     },
+
+    // for debug
     dispRequestHash: function() {
       showInMsgArea("dispRequestHash:");
       for (var i in this.requestHash) {
@@ -277,15 +299,16 @@
     var reqTableItem=null, reqObj=null, action=null, reqId=null, subId=null;
     if (msg.requestId != undefined) {
       reqId = msg.requestId;
-      reqTableItem = g_reqTable.getReqByReqId(reqId);
+      reqTableItem = g_reqTable.getRequest(reqId);
       reqObj = reqTableItem.reqObj;
     } else if (msg.subscriptionId != undefined) { 
       //reqIdなし、subIdあり＝subscribe notification の場合
       subId = msg.subscriptionId;
-      reqTableItem = g_reqTable.getReqBySubId(subId);
+      reqTableItem = g_reqTable.getRequestBySubId(subId);
       reqObj = reqTableItem.reqObj;
     }
-    action = reqObj.action;
+    if (reqObj)
+      action = reqObj.action;
 
     // case of 'get'
     if (action === "get") {
@@ -295,19 +318,19 @@
         showGetResMsg(msg.value, reqTableItem.dispId)
 
       // delete request from requestHash. delete even in error case
-      g_reqTable.delReqByReqId(reqId);
+      g_reqTable.deleteRequest(reqId);
     // case of 'set'
     } else if (action === "set") {
-      g_reqTable.delReqByReqId(reqId);
+      g_reqTable.deleteRequest(reqId);
 
     // case of 'subscribe'
     } else if (action === "subscribe") {
 
       if (isSubscribeSuccessResponse(msg)) {
-        g_reqTable.setSubIdToReq(msg.requestId, msg.subscriptionId);
+        g_reqTable.addSubId(msg.requestId, msg.subscriptionId);
 
       } else if (isSubscribeErrorResponse(msg)) {
-        g_reqTable.delReqByReqId(msg.requestId);
+        g_reqTable.deleteRequest(msg.requestId);
 
       } else if (isSubscriptionNotification(msg)) {
         // case of subscribeNotification
@@ -328,7 +351,7 @@
       if (msg.error != undefined) {
         // unsubscribe failed
         // - delete unsubscribe request from requestTable
-        g_reqTable.delReqByReqId(reqId);
+        g_reqTable.deleteRequest(reqId);
       } else {
         // unsubscribe success
         // - delete subscribe request from requestTable
@@ -337,12 +360,35 @@
         var targ_subId = msg.subscriptionId; //unsub対象のsubscribeのsubId
         var targ_reqId = g_reqTable.getReqIdBySubId(targ_subId); //subscribeのreqId
 
-        g_reqTable.delReqByReqId(targ_reqId); //subscribeのエントリを削除
-        g_reqTable.delReqByReqId(reqId);      //unsubのエントリを削除
+        g_reqTable.deleteRequest(targ_reqId); //subscribeのエントリを削除
+        g_reqTable.deleteRequest(reqId);      //unsubのエントリを削除
 
         // clear flag for button lock
         g_ui.clearSubscribeBtnLock(targ_reqId);
       }
+
+    // case of 'unsubscribeAll'
+    } else if (action === "unsubscribeAll") {
+      showInMsgArea("unsubscribeAll response received");
+      if (msg.error != undefined) {
+        console.log("unsubscribeAll: error");
+        // unsubscribeAll failed
+        // - delete unsubscribe request from requestTable
+        g_reqTable.deleteRequest(reqId);
+      } else {
+        console.log("unsubscribeAll: success");
+        // unsubscribeAll success
+        // - delete unsubscribe request from requestTable
+        // - delete ALL subscribe request from requestTable
+
+        var reqId = msg.requestId;
+        g_reqTable.deleteAllSubscribe();     //subscribeのエントリを全て削除
+        g_reqTable.deleteRequest(reqId);  //unsubのエントリを削除
+
+        // clear flag for ALL subscribe button lock
+        g_ui.clearSubscribeBtnLockAll();
+      }
+
     // case of 'authorize'
     } else if (action === "authorize") {
       if (isAuthorizeSuccessResponse(msg)) {
@@ -350,7 +396,7 @@
       } else if (isAuthorizeErrorResponse(msg)) {
         showGetResMsg("Rejected! err="+msg.error, reqTableItem.dispId);
       }
-      g_reqTable.delReqByReqId(reqId);
+      g_reqTable.deleteRequest(reqId);
     // case of 'getVSS'
     } else if (action === "getVSS") {
       // received VSS is shown in log msg textarea
@@ -359,9 +405,10 @@
       } else if (isVssErrorResponse(msg)) {
         showGetResMsg("Failed.", reqTableItem.dispId);
       }
-      g_reqTable.delReqByReqId(reqId);
+      g_reqTable.deleteRequest(reqId);
     } else {
       // others
+      console.log("unknown action received : " + action);
     }
   }
 
@@ -391,7 +438,7 @@
     }
     g_vehicle.close();
     g_vehicle = null;
-    g_reqTable.clearReqTable();
+    g_reqTable.clearAllRequest();
     showConnectMsg("WS Disconnected");
   }
 
@@ -403,13 +450,13 @@
   var dummyToken_device = "bbbbb";
   function wsAuthorize(_userToken, _deviceToken) {
     showInMsgArea("wsAuthorize:");
-    if (g_vehicle != null && g_vehicle.readyState === 1) {
+    if (g_vehicle != null && g_vehicle.readyState === WS_OPEN) {
       var reqId = getUniqueReqId();
       var tokens = {"authorization"     :dummyToken_user,
                     "www-vehicle-device":dummyToken_device};
       var req = {"action": "authorize", "tokens": tokens, "requestId":reqId};
       var item = {"reqObj": req, "dispId": 'msg_authorize'};
-      g_reqTable.addReqByReqId(reqId, item);
+      g_reqTable.addRequest(reqId, item);
       var json_str = JSON.stringify(req);
       g_vehicle.send(json_str);
       showInMsgArea("--: ==> " + json_str);
@@ -424,11 +471,11 @@
   function wsGetVss(_path) {
     //TODO: get VSS under path: not suppoted yet
     showInMsgArea("wsGetVss:");
-    if (g_vehicle != null && g_vehicle.readyState === 1) {
+    if (g_vehicle != null && g_vehicle.readyState === WS_OPEN) {
       var reqId = getUniqueReqId();
       var req = {"action": "getVSS", "path": _path, "requestId":reqId};
       var item = {"reqObj": req, "dispId": 'msg_getvss'};
-      g_reqTable.addReqByReqId(reqId, item);
+      g_reqTable.addRequest(reqId, item);
       var json_str = JSON.stringify(req);
       g_vehicle.send(json_str);
       showInMsgArea("--: ==> " + json_str);
@@ -441,11 +488,11 @@
 
   // === get ===
   function wsGetItem(_path, _dispId) {
-    if (g_vehicle != null && g_vehicle.readyState === 1) {
+    if (g_vehicle != null && g_vehicle.readyState === WS_OPEN) {
       var reqId = getUniqueReqId();
       var req = {"action": "get", "path": _path, "requestId":reqId};
       var item = {"reqObj": req, "dispId": _dispId}; //戻り値の表示先IDを追加
-      g_reqTable.addReqByReqId(reqId, item);
+      g_reqTable.addRequest(reqId, item);
       var json_str = JSON.stringify(req);
       g_vehicle.send(json_str);
       showInMsgArea("--: ==> " + json_str);
@@ -465,11 +512,11 @@
   // in case of 'set', dispId may not needed..
   function wsSetItem(path,value, _dispId) {
     showInMsgArea("wsSetItem:");
-    if (g_vehicle != null && g_vehicle.readyState === 1) {
+    if (g_vehicle != null && g_vehicle.readyState === WS_OPEN) {
       var reqId = getUniqueReqId();
       var req = {"action": "set", "path": path, "value": value, "requestId":reqId};
       var item = {"reqObj": req, "dispId": _dispId}; //戻り値の表示先IDを追加
-      g_reqTable.addReqByReqId(reqId, item);
+      g_reqTable.addRequest(reqId, item);
       var json_str = JSON.stringify(req);
       g_vehicle.send(json_str);
       showInMsgArea("--: ==> " + json_str);
@@ -494,10 +541,10 @@
   // === subscribe/unsubscribe ===
   function wsSubscribeItem(path, reqId, _dispId) {
     showInMsgArea("wsSubscribeItem: reqId = " + reqId);
-    if (g_vehicle != null && g_vehicle.readyState === 1) {
+    if (g_vehicle != null && g_vehicle.readyState === WS_OPEN) {
       var req ={"action": "subscribe", "path": path, "filters":"", "requestId":reqId};
       var item = {"reqObj": req, "dispId": _dispId}; //戻り値の表示先IDを追加
-      g_reqTable.addReqByReqId(reqId, item);
+      g_reqTable.addRequest(reqId, item);
       var json_str = JSON.stringify(req);
       g_vehicle.send(json_str);
       showInMsgArea("--: ==> " + json_str);
@@ -508,11 +555,23 @@
   }
   function wsUnsubscribeItem(path, subId, _dispId) {
     showInMsgArea("wsUnsubscribeItem: subId=" + subId);
-    if (g_vehicle != null && g_vehicle.readyState === 1) {
+    if (g_vehicle != null && g_vehicle.readyState === WS_OPEN) {
       var reqId = getUniqueReqId(); //reqIdはunsub用に新しいものを使用
       var req = {"action": "unsubscribe", "requestId":reqId, "subscriptionId":subId};
       var item = {"reqObj": req, "dispId": _dispId}; //戻り値の表示先IDを追加
-      g_reqTable.addReqByReqId(reqId, item);
+      g_reqTable.addRequest(reqId, item);
+      var json_str = JSON.stringify(req);
+      g_vehicle.send(json_str);
+      showInMsgArea("--: ==> " + json_str);
+    }
+  }
+  function wsUnsubscribeAll( ) {
+    showInMsgArea("wsUnsubscribeAll: subId=");
+    if (g_vehicle != null && g_vehicle.readyState === WS_OPEN) {
+      var reqId = getUniqueReqId(); //reqIdはunsub用に新しいものを使用
+      var req = {"action": "unsubscribeAll", "requestId":reqId};
+      var item = {"reqObj": req, "dispId": ""}; //戻り値の表示先IDを追加
+      g_reqTable.addRequest(reqId, item);
       var json_str = JSON.stringify(req);
       g_vehicle.send(json_str);
       showInMsgArea("--: ==> " + json_str);
@@ -565,6 +624,9 @@
     var path = "Signal.Chassis.SteeringWheel.Angle";
     var targ_subId = g_reqTable.getSubIdByReqId(g_ui.steerAngleReqId);
     wsUnsubscribeItem(path, targ_subId, "msg_sub_steer");
+  }
+  function btnUnsubscribeAll() {
+    wsUnsubscribeAll();
   }
 
   // === VSS item: get/set/sub/unsub ===
