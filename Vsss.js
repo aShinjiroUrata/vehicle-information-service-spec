@@ -578,7 +578,7 @@ function dataReceiveHandler(message) {
     obj = JSON.parse(message);
   } catch(e) {
     //irregurlar Json case
-    printLog(LOG_QUIET,"  :received irregular Json messaged. ignored.");
+    printLog(LOG_QUIET,"  :received irregular Json messaged. ignored. msg : "+message);
     printLog(LOG_QUIET,"  :Error = "+e);
     return;
   }
@@ -764,7 +764,11 @@ function judgeAuthorizeToken(token) {
 // == JSON Creation ==
 // ===================
 function createGetSuccessResponse(reqId, value, timestamp) {
-  var retObj = {"requestId": reqId, "value": value, "timestamp":timestamp};
+  var retObj = {"action":"get", "requestId": reqId, "value": value, "timestamp":timestamp};
+  return retObj;
+}
+function createGetErrorResponse(reqId, error, timestamp) {
+  var retObj = {"action":"get", "requestId": reqId, "error":error, "timestamp":timestamp};
   return retObj;
 }
 

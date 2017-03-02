@@ -35,3 +35,9 @@ To use:
 5.stop VISS server, mock data source server, simple web server
 - `$./stop.sh`
 
+Not support:
+* Use of `*` wildcard path in `Get` method
+* Use of `filter` in `subscribe` method
+* Specifying root path in `getVSS` method
+* Data point's access control by `authorize` method 
+
