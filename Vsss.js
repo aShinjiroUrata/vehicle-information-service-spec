@@ -15,8 +15,9 @@ var svr_config = require('./svr_config');
 var VISS_IP = svr_config.VISS_IP;
 var VISS_PORT = svr_config.VISS_PORT;
 var SUBPROTOCOL = "wvss1.0";
-var EXT_MOCKSVR_IP = '127.0.0.1';
-var EXT_MOCKSVR_PORT = 3001;
+
+var EXT_MOCKSVR_IP = svr_config.DATASRC_IP;
+var EXT_MOCKSVR_PORT = svr_config.DATASRC_PORT;
 
 // == data source selection ==
 var LOCAL_MOCK_DATA = 0;

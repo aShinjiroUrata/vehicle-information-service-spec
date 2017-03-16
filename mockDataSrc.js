@@ -15,7 +15,8 @@
 "use strict"
 
 // == Set Server IP and Port Number here ==
-var DATASRC_PORT = 3001;
+var svr_config = require('./svr_config');
+var DATASRC_PORT = svr_config.DATASRC_PORT;
 var TIMER_INTERVAL = 1000;
 
 //座席数の定義(vssには、Row5, Pos5などあり、無制限にありうるので)

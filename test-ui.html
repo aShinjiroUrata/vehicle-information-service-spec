@@ -287,7 +287,8 @@
   }
 
   function onWsMessage(event) {
-    showInMsgArea("--: <== " + event.data.substr(0,3000));
+    //showInMsgArea("--: <== " + event.data.substr(0,3000));
+    showInMsgArea("--: <== " + event.data.substr(0,300));
 
     var msg;
     try {
@@ -399,11 +400,16 @@
       g_reqTable.deleteRequest(reqId);
     // case of 'getVSS'
     } else if (action === "getVSS") {
+      console.log("getVSS:");
       // received VSS is shown in log msg textarea
       if (isVssSuccessResponse(msg)) {
         showGetResMsg("Successfully retrieved VSS json.", reqTableItem.dispId);
+        showInMsgArea("--:vss = " + JSON.stringify(msg.vss).substr(0,300));
       } else if (isVssErrorResponse(msg)) {
+        console.log("getVss: error case");
         showGetResMsg("Failed.", reqTableItem.dispId);
+      } else {
+        console.log("getVss: else case");
       }
       g_reqTable.deleteRequest(reqId);
     } else {
@@ -770,7 +776,7 @@
       return false;
   }
   function isVssErrorResponse(msg) {
-    if (msg.action === "authorize" && msg.requestId != undefined && msg.vss == undefined &&
+    if (msg.action === "getVSS" && msg.requestId != undefined && msg.vss == undefined &&
         msg.error != undefined)
       return true;
     else
