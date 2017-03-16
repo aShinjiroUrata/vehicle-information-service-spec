@@ -1,43 +1,65 @@
 # vehicle-signal-server-spec
 
-#### W3C Automotive WG Vehicle Information Service Specification
-#### prototype implementation by access
+W3C Automotive WG Vehicle Information Service Specification<br>
+prototype implementation by ACCESS
 
-Tested with:
+#### Tested with:
 * ubuntu14.04 LTS
-* node v4.5.0  / npm 2.15.9
-* ws v2.0.3 #necessary for sub-protocol
+* node v7.3.0  / npm 3.10.10
+* ws v2.0.3 or newer #necessary for sub-protocol
 
-To use:
+#### To use:
 
-1.Install npm packages
-- `$npm install fs http ws websocket socket.io socket.io-client http-server`
-- or just
-- `$npm install
-- install http-server in global
+0.Prerequiste
+- Install node v7.3.0
+- Install npm v3.10.10
+
+1.Clone
+- `git clone https://github.com/aShinjiroUrata/vehicle-signal-server-spec.git`
+- `cd vehicle-signal-server-spec`
+
+2.Install npm packages
+- `$npm install fs http ws websocket socket.io socket.io-client`
 - `$npm install -g http-server`
 
-2.Edit svr_config.js
-- update `VISS_IP` with your server's IP
-- update `VISS_PORT` with port no you want to use
-- VISS's websocket server opens with this IP and port<br>
-  (following port numbers are already in use. please select another one<br>
+3.Edit `svr_config.js`
+- (mandatory) update `VISS_IP` with your host's IP 
+- (mandatory) update `DATASRC_IP` with your host's IP.<br>
+  (If mockDataSrc.js or other data source resides in a different server, use its IP.)  
+- if necessary, update `VISS_PORT` with port No not yet in use
+- if necessary, update `DATASRC_PORT` with port No not yet in use
+  (In default setting, below port No will be used.<br>
+   If these port No are not available, you should change port number<br>
+   3000: VISS server<br>
    3001: mockDataSrc.js<br>
-   8081: simple web server)
+   8081: http-server)
 
-3.start VISS server
+4.start VISS server
 - `$./start.sh`<br>
-  (The script starts 'mock data source', 'VISServer', 'node's http-server'.<br>
-   node's web server uses port:8000 by default.)
+  (The script starts 'mock data source', 'VISS server', 'http-server'.)
 
-4.Open test-ui app by browser with url = http://{VISS_IP}:8081/test-ui.html
+5.Open test-ui app by browser with url = http://{VISS_IP}:8081/test-ui.html
 
-5.stop VISS server, mock data source server, simple web server
+6.stop VISS server, mock data source server, node's web server
 - `$./stop.sh`
 
-Not support:
-* Use of `*` wildcard path in `Get` method
-* Use of `filter` in `subscribe` method
-* Specifying root path in `getVSS` method
-* Data point's access control by `authorize` method 
+#### Support status
+
+##### Support:
+* get method basic function
+* set method basic function
+* subscribe method basic function
+* unsubscribe method
+* unsubuscribeAll method
+* authorize method basic function
+* getVSS method basic function
+* use from multiple client
+
+##### Not support:
+* `*` wildcard path in `Get` method
+* `filter` in `subscribe` method
+* Specifying path in `getVSS` method
+* Data point's access control by `authorize` method
+* when error occurred, returning adequate error code
+* wss:// scheme not supported
 
