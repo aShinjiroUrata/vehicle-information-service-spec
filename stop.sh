@@ -1,7 +1,7 @@
 #!/bin/bash
 
 pgrep -f 'http-server' | xargs kill &
-pgrep -f 'Vsss' | xargs kill &
+pgrep -f 'visSvr' | xargs kill &
 pgrep -f 'mockData' | xargs kill &
 pgrep -f 'httpsvr_start' | xargs kill &
 

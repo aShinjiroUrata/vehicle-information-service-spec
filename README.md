@@ -1,4 +1,4 @@
-# vehicle-signal-server-spec prototype README
+# vehicle-information-service-spec prototype README
 last update: March 22, 2017 
 
 W3C Automotive WG Vehicle Information Service Specification<br>
@@ -17,8 +17,8 @@ prototype implementation by ACCESS
 
 1.Clone
 ```
-git clone https://github.com/aShinjiroUrata/vehicle-signal-server-spec.git`
-cd vehicle-signal-server-spec`
+git clone https://github.com/aShinjiroUrata/vehicle-information-service-spec.git`
+cd vehicle-information-service-spec`
 ```
 2.Install npm packages
 ```

@@ -5,8 +5,8 @@ forever start mockDataSrc.js &
 
 sleep 2s
 
-#node Vsss.js &
-forever start Vsss.js &
+#node visSvr.js &
+forever start  visSvr.js &
 
 #http-server -p 8081 -d false &
 forever start ./httpsvr_start.js

@@ -209,7 +209,7 @@ function updateDataObj(_dataObj, _updateList) {
   }
 }
 
-// dataObjからVSSS送付用のJSONを作成する
+// dataObjからVISS送付用のJSONを作成する
 function generatePushJson(_dataObj) {
 
   //dataObjをtraverseして、push用Jsonを作成する
