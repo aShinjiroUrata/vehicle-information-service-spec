@@ -1,12 +1,13 @@
-# vehicle-signal-server-spec
+# vehicle-signal-server-spec prototype README
+last update: March 22, 2017 
 
 W3C Automotive WG Vehicle Information Service Specification<br>
 prototype implementation by ACCESS
 
 #### Tested with:
 * ubuntu14.04 LTS
-* node v7.3.0  / npm 3.10.10
-* ws v2.0.3 or newer #necessary for sub-protocol
+* node v7.3.0  / npm 3.10.10 #older version should work but not tested
+* ws v2.0.3 or newer #necessary for using sub-protocol
 
 #### To use:
 
@@ -15,33 +16,43 @@ prototype implementation by ACCESS
 - Install npm v3.10.10
 
 1.Clone
-- `git clone https://github.com/aShinjiroUrata/vehicle-signal-server-spec.git`
-- `cd vehicle-signal-server-spec`
-
+```
+git clone https://github.com/aShinjiroUrata/vehicle-signal-server-spec.git`
+cd vehicle-signal-server-spec`
+```
 2.Install npm packages
-- `$npm install fs http ws websocket socket.io socket.io-client`
-- `$npm install -g http-server`
-
+```
+$npm install fs http ws websocket socket.io socket.io-client
+$npm install -g http-server forever
+```
 3.Edit `svr_config.js`
-- (mandatory) update `VISS_IP` with your host's IP 
-- (mandatory) update `DATASRC_IP` with your host's IP.<br>
-  (If mockDataSrc.js or other data source resides in a different server, use its IP.)  
-- if necessary, update `VISS_PORT` with port No not yet in use
-- if necessary, update `DATASRC_PORT` with port No not yet in use
-  (In default setting, below port No will be used.<br>
-   If these port No are not available, you should change port number<br>
-   3000: VISS server<br>
-   3001: mockDataSrc.js<br>
-   8081: http-server)
+- (mandatory) update `VISS_IP` with the IP where this VISS prototype runs.
+- (mandatory) update `DATASRC_IP` with the IP where mockDataSrc.js runs.<br>
+  As default, should be same with `VISS_IP`.<br>
+  If mockDataSrc.js or other data source resides in a different server, use its IP.<br>
+- Update port number if necessary.<br>
+  In default setting, below port numbers will be used.<br>
+   ```
+   - VISS server port number: VISS_PORT = 3000 @svr_config.js
+   - mockDataSrc.js port number: DATASRC_PORT = 3001 @svr_config.js
+   - http server port number: 8081 @start.sh
+   ```
+  If any of these are already occupied, please change to available port number<br>
 
 4.start VISS server
-- `$./start.sh`<br>
-  (The script starts 'mock data source', 'VISS server', 'http-server'.)
+```
+$./start.sh`
+```
+(This script starts 'mock data source', 'VISS server', 'http-server'.)
 
-5.Open test-ui app by browser with url = http://{VISS_IP}:8081/test-ui.html
-
+5.Open test-ui WebApp by browser with below url
+```
+http://{VISS_IP}:8081/test-ui.html
+```
 6.stop VISS server, mock data source server, node's web server
-- `$./stop.sh`
+```
+$./stop.sh
+```
 
 #### Support status
 
@@ -56,7 +67,7 @@ prototype implementation by ACCESS
 * use from multiple client
 
 ##### Not support:
-* `*` wildcard path in `Get` method
+* `*` wildcard path in `get` method
 * `filter` in `subscribe` method
 * Specifying path in `getVSS` method
 * Data point's access control by `authorize` method
