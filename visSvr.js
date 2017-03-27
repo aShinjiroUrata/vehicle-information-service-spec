@@ -16,6 +16,9 @@ var VISS_IP = svr_config.VISS_IP;
 var VISS_PORT = svr_config.VISS_PORT;
 var SUBPROTOCOL = "wvss1.0";
 
+var TOKEN_VALID = svr_config.TOKEN_VALID;
+var TOKEN_INVALID = svr_config.TOKEN_INVALID;
+
 var EXT_MOCKSVR_IP = svr_config.DATASRC_IP;
 var EXT_MOCKSVR_PORT = svr_config.DATASRC_PORT;
 
@@ -39,10 +42,16 @@ var LOG_CUR_LEVEL = LOG_DEFAULT;
 var ERR_SUCCESS = 'success';
 var ERR_INVALID_TOKEN = 'invalid token';
 
+// Error from VISS spec
+var ERR_USER_FORBIDDEN   = '403';
+var ERR_USER_UNKNOWN     = '403';
+var ERR_DEVICE_FORBIDDEN = '403';
+var ERR_DEVICE_UNKNOWN   = '403';
+
 // == static values ==
 // TODO: TTL value is period?(e.g. 1000sec) or clock time(e.g. 2017/02/07-15:43:00.000)
 // May be clock time is easy to use. If period, need to memorize start time.
-var AUTHORIZE_TTL = 1000000; //sec? dummy value for now
+var AUTHORIZE_TTL = 30; //sec. mock value
 
 // ===========================
 // == Start WebSocketServer ==
@@ -438,14 +447,55 @@ ReqTable.prototype.dispReqIdHash = function() {
   }
 }
 
+// ================================
+// == Authorize Hash Constructor ==
+// ================================
+// Very easy impl of Authorize system. TODO: change to better impl.
+function AuthHash() {
+  // AuthHash usage
+  // - if 'path' is not found in AuthHash => the pass is accessible by any action
+  // - if 'path' is found in AuthHash => the pass needs 'authorize' for access
+  // - if the 'path's 'get' value is false => can not 'get' the data (need authorize)
+  //   basically, if 'authorize' success, the value of 'get','set','subscribe' should set to 'true'
+  //   (this access-control impl is adhoc and easy example.
+  this.hash = {};
+  this.hash['Signal.Cabin.Door.Row1.Right.IsLocked'] = {'get':false, 'set':false, 'subscribe':false};
+  this.hash['Signal.Cabin.Door.Row1.Left.IsLocked']  = {'get':false, 'set':false, 'subscribe':false};
+  this.hash['Signal.Cabin.HVAC.Row1.RightTemperature'] = {'get':false, 'set':false, 'subscribe':false};
+  this.hash['Signal.Cabin.HVAC.Row1.LeftTemperature']  = {'get':false, 'set':false, 'subscribe':false};
+
+}
+AuthHash.prototype.grantAll = function() {
+  printLog(LOG_DEFAULT,"  :AuthHash.grantAll()");
+  for (var id in this.hash) {
+    var obj = this.hash[id];
+    obj.get = true;
+    obj.set = true;
+    obj.subscribe = true;
+  }
+  printLog(LOG_DEFAULT,"  :AuthHash=" + JSON.stringify(this.hash));
+}
+AuthHash.prototype.ungrantAll = function() {
+  printLog(LOG_DEFAULT,"  :AuthHash.ungrantAll()");
+  for (var id in this.hash) {
+    var obj = this.hash[id];
+    obj.get = false;
+    obj.set = false;
+    obj.subscribe = false;
+  }
+  printLog(LOG_DEFAULT,"  :AuthHash=" + JSON.stringify(this.hash));
+}
+
 wssvr.on('connection', function(ws) {
 
   var _sessId = createNewSessID();
   var _reqTable = new ReqTable();
+  var _authHash = new AuthHash();
+ 
   printLog(LOG_DEFAULT,"  :ws.on:connection: sessId= " + _sessId);
 
   // store sessID, reqTable, ws in a global hash
-  g_sessionHash[_sessId] = {'ws': ws, 'reqTable': _reqTable};
+  g_sessionHash[_sessId] = {'ws': ws, 'reqTable': _reqTable, 'authHash': _authHash};
 
   // for connecting to outside data source
   ws.on('message', function(message) {
@@ -471,30 +521,46 @@ wssvr.on('connection', function(ws) {
       printLog(LOG_DEFAULT,"  :get request registered. reqId=" + reqId + ", path=" + path);
 
     } else if (obj.action === "set") {
-      //printLog(LOG_DEFAULT,"  :action=" + obj.action);
+      printLog(LOG_DEFAULT,"  :action=" + obj.action);
       var reqId = obj.requestId;
       var path = obj.path;
       var value = obj.value;
       var ret = _reqTable.addReqToTable(obj, null, null);
 
-      // TODO: for now support extMockDataSrc only. support other dataSrc when needed.
-      g_extMockDataSrc.sendSetRequest(obj, reqId, _sessId);
-      printLog(LOG_DEFAULT,"  :set request registered. reqId=" + reqId + ", path=" + path);
+      var ret = accessControlCheck(path,'set', _authHash);
+      printLog(LOG_DEFAULT ,"  : accessControlCheck = " + ret );
+
+      if (ret == false) {
+        printLog(LOG_DEFAULT ,"  : 'authorize' required for 'set' value to " + path );
+        var ts = getUnixEpochTimestamp();
+        var err = ERR_USER_FORBIDDEN; //TODO better to use detailed actual reason
+        resObj = createSetErrorResponse(reqId, err, ts);
+        ws.send(JSON.stringify(resObj));
+      } else {
+        // TODO: for now support extMockDataSrc only. support other dataSrc when needed.
+        g_extMockDataSrc.sendSetRequest(obj, reqId, _sessId);
+        printLog(LOG_DEFAULT,"  :set request registered. reqId=" + reqId + ", path=" + path);
+      }
+
     } else if (obj.action === "authorize") {
       var reqId = obj.requestId;
       var token = obj.tokens;
 
-      var err = judgeAuthorizeToken(token);
+      var err = mock_judgeAuthorizeToken(token);
       var resObj;
       if (err === ERR_SUCCESS) {
-        printLog(LOG_QUIET,"  :Failed to add subscribe info to IdTable. Cancel the timer.");
+        printLog(LOG_DEFAULT,"  :authorize token check succeeded.");
+        //change authorize status
+        _authHash.grantAll();
         resObj = createAuthorizeSuccessResponse(reqId, AUTHORIZE_TTL);
+        // Timer for 'authorize expiration'
+        setTimeout(function() { _authHash.ungrantAll();}, AUTHORIZE_TTL * 1000);
       } else {
+        printLog(LOG_DEFAULT,"  :authorize token check failed.");
         resObj = createAuthorizeErrorResponse(reqId, err);
       }
       ws.send(JSON.stringify(resObj));
-      // TODO: how to realize 'Authorize expiration'?
-      printLog(LOG_DEFAULT,"  :authorize request registered. reqId=" + reqId + ", token=" + token);
+
     } else if (obj.action === "getVSS") {
       // - VSS json is retrieved from dataSrc
       // TODO:
@@ -504,6 +570,7 @@ wssvr.on('connection', function(ws) {
       var ret = _reqTable.addReqToTable(obj, null, null);
       g_extMockDataSrc.sendVssRequest(obj, reqId, _sessId);
       printLog(LOG_DEFAULT,"  :getVss request registered. reqId=" + reqId + ", path=" + path);
+
     // for 'subscribe'
     } else if (obj.action === "subscribe") {
 
@@ -567,7 +634,9 @@ wssvr.on('connection', function(ws) {
     // delete a session
     var sess = g_sessionHash[_sessId];
     sess.ws = null;
+
     delete sess.reqTable;
+    delete sess.authHash;
     delete g_sessionHash[_sessId];
   });
 });
@@ -700,6 +769,31 @@ function matchPath(reqObj, dataObj) {
   return undefined;
 }
 
+function accessControlCheck(_path, _action, _authHash) {
+  printLog(LOG_DEFAULT,"  :accessControlCheck");
+  var _obj = _authHash.hash[_path];
+  printLog(LOG_DEFAULT,"  :hash=" + JSON.stringify( _authHash.hash  ));
+
+  printLog(LOG_DEFAULT,"  :_path=" + _path);
+  printLog(LOG_DEFAULT,"  :_action=" + _action);
+  printLog(LOG_DEFAULT,"  :_obj=" + _obj);
+  printLog(LOG_DEFAULT,"  :_obj=" + JSON.stringify(_obj));
+
+  if (_obj == undefined) {
+    return true;
+  } else {
+    var _status = _obj[_action];
+    printLog(LOG_DEFAULT,"  :_status=" + _status);
+    if (_status == undefined) {
+      return false;
+    } else if (_status == true) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+}
+
 // ===================
 // == Utility funcs ==
 // ===================
@@ -724,6 +818,12 @@ function getUniqueSubId() {
   var strength = 1000;
   var uniq = getSemiUniqueId();
   return "subid-"+uniq;
+}
+
+function getUnixEpochTimestamp() {
+  // get mili sec unix epoch string
+  var ts = new Date().getTime().toString(10);
+  return ts;
 }
 
 function getTimeString() {
@@ -753,9 +853,11 @@ function extractTargetVss(_vssObj, _path) {
   //TODO: empty func. do this later.
   return _vssObj;
 }
-function judgeAuthorizeToken(token) {
+function mock_judgeAuthorizeToken(token) {
   //TODO: empty func. for now, return SUCCESS if token exists.
-  if (token)
+  var user_token = token['authorization'];
+  var device_token = token['www-vehicle-device'];
+  if (user_token == TOKEN_VALID || device_token == TOKEN_VALID)
     return ERR_SUCCESS;
   else
     return ERR_INVALID_TOKEN;

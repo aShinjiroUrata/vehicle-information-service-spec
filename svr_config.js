@@ -1,12 +1,16 @@
 // Copyright (c) 2017 ACCESS CO., LTD. All rights reserved.
 //
 // == Config VIS Server IP and Port Number here ==
-var VISS_IP = '10.5.162.79';
+var VISS_IP = '127.0.0.1';
+
 var VISS_PORT = '3000';
 var VISS_SUBPROTO = 'wvss1.0';
 
-var DATASRC_IP = '10.5.162.79';
+var DATASRC_IP = '127.0.0.1';
 var DATASRC_PORT = '3001';
+
+var TOKEN_VALID = 'token_valid';
+var TOKEN_INVALID = 'token_invalid';
 
 try {
   // node require()
@@ -14,8 +18,10 @@ try {
     VISS_IP   : VISS_IP, // VISS's host IP
     VISS_PORT : VISS_PORT,
     VISS_SUBPROTO : VISS_SUBPROTO,
-    DATASRC_IP : DATASRC_IP,
-    DATASRC_PORT : DATASRC_PORT
+    DATASRC_IP    : DATASRC_IP,
+    DATASRC_PORT  : DATASRC_PORT,
+    TOKEN_VALID   : TOKEN_VALID,
+    TOKEN_INVALID : TOKEN_INVALID
   }
 } catch(e) {
 

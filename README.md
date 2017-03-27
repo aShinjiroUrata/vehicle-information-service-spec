@@ -26,8 +26,10 @@ $npm install fs http ws websocket socket.io socket.io-client
 $npm install -g http-server forever
 ```
 3.Edit `svr_config.js`
-- (mandatory) update `VISS_IP` with the IP where this VISS prototype runs.
-- (mandatory) update `DATASRC_IP` with the IP where mockDataSrc.js runs.<br>
+- Default IP address for VISS prototype is '127.0.0.1'. <br>
+  Change the IP address by modifying `VISS_IP` in case you need (such as you put VISS on public internet).<br>
+- Default IP address for mockDataSrc is '127.0.0.1'.<br>
+  Change the IP address by modifying `DATASRC_IP` in case you need.<br>
   As default, should be same with `VISS_IP`.<br>
   If mockDataSrc.js or other data source resides in a different server, use its IP.<br>
 - Update port number if necessary.<br>

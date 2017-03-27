@@ -37,6 +37,7 @@
     .val_area { height: 20px; width:150px; background-color:lightgrey; font-size:14px; display:inline-block;}
     #server_info {height:20px; width:500px; font-size:13px;}
     #span_path {height:20px; width:20px; font-size:13px;}
+    .span_text {height:20px; width:20px; font-size:13px;}
   </style>
   <script src="./svr_config.js"></script>
 </head>
@@ -54,7 +55,9 @@
       <button onclick="wsDisconnect();">ws disconnect</button>
       <span class="val_area" id="msg_connect"></span>
 
-      <br><button onclick="btnAuthorize();">authorize</button>
+      <br>
+      <button onclick="btnAuthorizeValidToken();"  >authorize with valid token</button>
+      <button onclick="btnAuthorizeInvalidToken();">authorize with invalid token</button>
       <span class="val_area" id="msg_authorize"></span>
       <br><button onclick="btnGetVss();">get VSS</button>
       <span class="val_area" id="msg_getvss"></span>
@@ -70,11 +73,13 @@
 
       <br><button onclick="btnSetDoorRow1RightLock();">set DoorLock(Row1-Right)</button>
       <input type="text" class="val_area" id="txt_set_doorRow1RightLock" ></input>
+      <span class="span_text">(*authorize required)</span>
       <br><button onclick="btnGetDoorRow1RightLock();">get DoorLock(Row1-Right)</button>
       <span class="val_area" id="msg_get_doorRow1RightLock" ></span>
 
       <br><button onclick="btnSetHVACRow1RightTemp();">set HVACTemp(Row1-Right)</button>
       <input type="text" class="val_area" id="txt_set_hvacRow1RightTemp"></input>
+      <span class="span_text">(*authorize required)</span>
       <br><button onclick="btnGetHVACRow1RightTemp();">get HVACTemp(Row1-Right)</button>
       <span class="val_area" id="msg_get_hvacRow1RightTemp"></span>
       <br>
@@ -313,16 +318,27 @@
 
     // case of 'get'
     if (action === "get") {
-      if (reqTableItem.dispId === 'msg_vss')
-        showGetVssResMsg(msg.value, reqObj.action, reqObj.path);
-      else
-        showGetResMsg(msg.value, reqTableItem.dispId)
+      if (isGetSuccessResponse(msg)) {
+        if (reqTableItem.dispId === 'msg_vss')
+          showGetVssResMsg(msg.value, reqObj.action, reqObj.path);
+        else
+          showGetResMsg(msg.value, reqTableItem.dispId)
 
-      // delete request from requestHash. delete even in error case
-      g_reqTable.deleteRequest(reqId);
+        // delete request from requestHash. delete even in error case
+        g_reqTable.deleteRequest(reqId);
+      } else if (isGetErrorResponse(msg)) {
+        showInMsgArea("--: <== 'get' request was rejected");
+        g_reqTable.deleteRequest(reqId);
+      }
     // case of 'set'
     } else if (action === "set") {
-      g_reqTable.deleteRequest(reqId);
+      if (isSetSuccessResponse(msg)) {
+        // nothing to do
+        g_reqTable.deleteRequest(reqId);
+      } else if (isSetErrorResponse(msg)) {
+        g_reqTable.deleteRequest(reqId);
+        showInMsgArea("--: <== 'set' request was rejected");
+      }
 
     // case of 'subscribe'
     } else if (action === "subscribe") {
@@ -332,6 +348,7 @@
 
       } else if (isSubscribeErrorResponse(msg)) {
         g_reqTable.deleteRequest(msg.requestId);
+        showInMsgArea("--: <== 'subscribe' request was rejected");
 
       } else if (isSubscriptionNotification(msg)) {
         // case of subscribeNotification
@@ -361,8 +378,8 @@
         var targ_subId = msg.subscriptionId; //unsub対象のsubscribeのsubId
         var targ_reqId = g_reqTable.getReqIdBySubId(targ_subId); //subscribeのreqId
 
-        g_reqTable.deleteRequest(targ_reqId); //subscribeのエントリを削除
-        g_reqTable.deleteRequest(reqId);      //unsubのエントリを削除
+        g_reqTable.deleteRequest(targ_reqId); // delete subscribe's entry in reqTable
+        g_reqTable.deleteRequest(reqId);      // delete unsub's entry in reqTable
 
         // clear flag for button lock
         g_ui.clearSubscribeBtnLock(targ_reqId);
@@ -383,8 +400,8 @@
         // - delete ALL subscribe request from requestTable
 
         var reqId = msg.requestId;
-        g_reqTable.deleteAllSubscribe();     //subscribeのエントリを全て削除
-        g_reqTable.deleteRequest(reqId);  //unsubのエントリを削除
+        g_reqTable.deleteAllSubscribe();  // delete all entry of subscribe in reqTable
+        g_reqTable.deleteRequest(reqId);  // delete unsub's entry in reqTable
 
         // clear flag for ALL subscribe button lock
         g_ui.clearSubscribeBtnLockAll();
@@ -393,7 +410,7 @@
     // case of 'authorize'
     } else if (action === "authorize") {
       if (isAuthorizeSuccessResponse(msg)) {
-        showGetResMsg("Authorized! TTL="+msg.TTL, reqTableItem.dispId);
+        showGetResMsg("Authorized! TTL="+msg.TTL+"sec", reqTableItem.dispId);
       } else if (isAuthorizeErrorResponse(msg)) {
         showGetResMsg("Rejected! err="+msg.error, reqTableItem.dispId);
       }
@@ -449,17 +466,12 @@
   }
 
   // === authorize ===
-  // TODO:
-  // in 1st version, realize json msg exchange.
-  // use dummy token for now.
-  var dummyToken_user   = "aaaaa";
-  var dummyToken_device = "bbbbb";
   function wsAuthorize(_userToken, _deviceToken) {
     showInMsgArea("wsAuthorize:");
     if (g_vehicle != null && g_vehicle.readyState === WS_OPEN) {
       var reqId = getUniqueReqId();
-      var tokens = {"authorization"     :dummyToken_user,
-                    "www-vehicle-device":dummyToken_device};
+      var tokens = {"authorization"     : _userToken,
+                    "www-vehicle-device": _deviceToken};
       var req = {"action": "authorize", "tokens": tokens, "requestId":reqId};
       var item = {"reqObj": req, "dispId": 'msg_authorize'};
       g_reqTable.addRequest(reqId, item);
@@ -469,8 +481,11 @@
     }
   }
 
-  function btnAuthorize() {
-    wsAuthorize(dummyToken_user, dummyToken_device);
+  function btnAuthorizeValidToken() {
+    wsAuthorize(TOKEN_VALID, TOKEN_VALID);
+  }
+  function btnAuthorizeInvalidToken() {
+    wsAuthorize(TOKEN_INVALID, TOKEN_INVALID);
   }
 
   // === getVSS ===
@@ -704,6 +719,53 @@
     var vss_desc2 = document.getElementById("msg_vss_desc2");
     vss_desc1.innerHTML = txt1;
     vss_desc2.innerHTML = txt2;
+  }
+
+  // == get helper funcs ==
+  function isGetSuccessResponse(msg) {
+    // This is getSuccessResponse if ...
+    // must exist    : action, requestId, value, timestamp
+    // must not exist: error
+    if (msg.action === "get" && msg.requestId != undefined && 
+        msg.value  != undefined && msg.timestamp != undefined &&
+        msg.error == undefined)
+      return true;
+    else
+      return false;
+  }
+  function isGetErrorResponse(msg) {
+    // This is getErrorResponse if ...
+    // must exist    : action, requestId, error, timestamp
+    // must not exist: value
+    if (msg.action === 'get' && msg.requestId != undefined && 
+        msg.error != undefined && msg.timestamp != undefined && 
+        msg.value == undefined)
+      return true;
+    else
+      return false;
+  }
+
+  // == set helper funcs ==
+  function isSetSuccessResponse(msg) {
+    // This is setSuccessResponse if ...
+    // must exist    : action, requestId, timestamp
+    // must not exist: error, value
+    if (msg.action === "set" && msg.requestId != undefined && msg.timestamp != undefined &&
+        msg.value == undefined && msg.error == undefined)
+      return true;
+    else
+      return false;
+  }
+  function isSetErrorResponse(msg) {
+    // This is setErrorResponse if ...
+    // must exist    : action, requestId, error, timestamp
+    // must not exist: value
+    if (msg.action === 'set' && msg.requestId != undefined && msg.error != undefined && msg.timestamp != undefined && 
+        msg.value == undefined)
+      return true;
+    else
+      return false;
+
   }
 
   // == subscribe helper funcs ==
