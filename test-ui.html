@@ -444,10 +444,21 @@
       showInMsgArea("--:WebSocket already open");
       return;
     }
-    var url = "ws://" + VISS_IP + ":" + VISS_PORT;
+    //surata
+    //var url = "ws://" + VISS_IP + ":" + VISS_PORT;
+    //var url = "wss://" + VISS_IP + ":" + VISS_PORT;
+
+    // for NewSky
+    var url = "wss://" + VISS_IP;
+
     showInMsgArea("--:URL = " + url);
     showInMsgArea("--:subprotocol = " + SUBPROTOCOL);
+
+    //g_vehicle = new WebSocket(url, SUBPROTOCOL);
+    
+    // for NewSky
     g_vehicle = new WebSocket(url, SUBPROTOCOL);
+
     g_vehicle.onopen = onWsOpen;
     g_vehicle.onclose = onWsClose;
     g_vehicle.onmessage = onWsMessage;

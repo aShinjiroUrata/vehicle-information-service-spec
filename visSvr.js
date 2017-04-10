@@ -19,6 +19,10 @@ var SUBPROTOCOL = "wvss1.0";
 var TOKEN_VALID = svr_config.TOKEN_VALID;
 var TOKEN_INVALID = svr_config.TOKEN_INVALID;
 
+//surata
+var TLS_KEY = svr_config.TLS_KEY;
+var TLS_CRT = svr_config.TLS_CRT;
+
 var EXT_MOCKSVR_IP = svr_config.DATASRC_IP;
 var EXT_MOCKSVR_PORT = svr_config.DATASRC_PORT;
 
@@ -64,12 +68,51 @@ function selectProtocols(protocols) {
   return SUBPROTOCOL;
 };
 
+//==>>
+// for secure websocket
+/*
+var fs    = require('fs');
+var https = require('https');
+var ws    = require('ws');
+
+var app = https.createServer(
+            { key : fs.readFileSync(TLS_KEY),
+              cert: fs.readFileSync(TLS_CRT) },
+            function(req, res) {
+              res.writeHead(200);
+              res.end("All glory to WebSockets!\n");
+            }).listen(VISS_PORT, VISS_IP);
+
+var wssvr = new ws.Server({
+              server : app
+              ,host   : VISS_IP
+              //,port   : VISS_PORT
+              ,handleProtocols : selectProtocols 
+            });
+*/
+/*
+wss.on("connection", function(wsConnect) {
+  console.log("open");
+  wsConnect.on("message", function (message) {
+    console.log(message);
+  });
+  wsConnect.on("close", function () {
+    console.log("close");
+  });
+});
+*/
+
+//<<==
+// for usual websocket
 var WebSocketServer = require('ws').Server;
 var wssvr = new WebSocketServer({
   host : VISS_IP,
   port : VISS_PORT,
+  //key  : fs.readFileSync(TLS_KEY),
+  //cert : fs.readFileSync(TLS_CRT),
   handleProtocols : selectProtocols 
 });
+
 
 // =========================================
 // == dataSrc connection: local mock data ==
