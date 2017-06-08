@@ -67,11 +67,11 @@ $./stop.sh
 * authorize method basic function
 * getVSS method basic function
 * use from multiple client
+* Specifying path in `getVSS` method
 
 ##### Not support:
 * `*` wildcard path in `get` method
 * `filter` in `subscribe` method
-* Specifying path in `getVSS` method
 * Data point's access control by `authorize` method
 * when error occurred, returning adequate error code
 * wss:// scheme not supported

@@ -663,6 +663,8 @@ function dataReceiveHandler(message) {
   // if 'getVSS' or 'set' response exists..
   if (vssObj || setObj) {
     //printLog(LOG_DEFAULT,"  :getVss message=" + JSON.stringify(vssObj).substr(0,200));
+
+    //[TODO] vssObj setObj 両方あるケースはなかったか？
     if (vssObj)
       resObj = vssObj;
     else
@@ -685,15 +687,18 @@ function dataReceiveHandler(message) {
       var _ws = _sessObj.ws;
       var _reqObj = _reqTable.requestHash[_reqId];
 
+      // for getVss response
       if (vssObj) {
         if (resObj.error != undefined) {
           retObj = createVssErrorResponse(_reqObj.requestId, resObj.error);
         } else {
           //TODO: need to extract subtree under 'path'
-          var targetVss = extractTargetVss(resObj.vss, _reqObj.path);
+          console.log("> > > Entering extractPartialVss");
+          var targetVss = extractPartialVss(resObj.vss, _reqObj.path);
           retObj = createVssSuccessResponse(_reqObj.requestId, targetVss);
         }
         printLog(LOG_VERBOSE,"  :getVss response="+JSON.stringify(retObj).substr(0,3000));
+      // for set response
       } else {
         if (resObj.error != undefined) {
           retObj = createSetErrorResponse(_reqObj.requestId, resObj.error, resObj.timestamp);
@@ -849,10 +854,90 @@ function printLog(lvl, msg) {
 // ==================
 // == helper funcs ==
 // ==================
-function extractTargetVss(_vssObj, _path) {
-  //TODO: empty func. do this later.
-  return _vssObj;
+
+// == extract partial vss from full-vss-tree by specifying 'path'
+function extractPartialVss(_objVssAll, _strPath) {
+
+  //pathの分類
+  // a.fullpath
+  // b.途中まで
+  // #getVSSは wildcard 非サポート
+
+  // 手順
+  // - _strPath を.で分割
+  // - _objVssAllをルートからたどっていく
+  // - _strPathの最後までたどれたら、_objVssAllは、_strPathを含んでいる
+  // - _objVssAllから_strPathに該当する部分ツリーを取り出す
+  // - それを返す
+  // - 指定した_strPathが_objVssAllに含まれない場合、nullを返す、でよい？
+
+  // _strPathが空文字列の場合、全ツリーを返す
+  if (_strPath == '' || _strPath == undefined || _strPath == null)
+    return _objVssAll;
+
+  // - _strPath を.で分割
+  var nodeNames = _strPath.split(".");
+
+  // - _objVssAllをルートからたどっていく
+  var pathLen = nodeNames.length;
+  var allTree = _objVssAll;
+  var allTreePtr = null;  // allTreeをたどるためのポインタ
+  allTreePtr = allTree;
+
+  var resultTree = {};
+  var resultTreePtr = resultTree; // resultTreeをたどるためのポインタ
+
+  for (var i=0; i<pathLen; i++) {
+    var node = nodeNames[i];
+    if (allTreePtr[node] == undefined) {
+      // _strPathのノードの一部がvssAll内に含まれない
+      // => _strPathにマッチするVssはなし。null を return
+      return null;
+    }
+
+    // ノードはvssAllに含まれていた
+    console.log("Node:["+node+"] exists");
+    var nextNode = allTreePtr[node];
+    var nextNodeCopy = Object.assign({},nextNode); // Object.assign()はobjectのコピー
+
+    //resultTreeに現ノードを追加
+    resultTreePtr[node] = nextNodeCopy;
+
+    // ループの最終周なら、ここで結果を返して終了
+    if (i == pathLen-1) {
+      //カレントノードがchildrenなしなら、そのまま返す
+      console.log("<br>SUCCESS: reached to the end");
+      console.log("res = " + JSON.stringify(resultTree));
+      return resultTree;
+    }
+
+    // 以降、次ループ用の準備
+
+    // allTreePtrのポインタを移動する
+    if (nextNode['children'] != undefined) {
+      console.log("children exists. Go next loop.");
+      allTreePtr = nextNode['children'];
+    } else {
+      // childrenが無い場合は、現ノードに移動
+      // ただし、この場合、これ以上の子ノードが無いので、
+      // 次ループは意味が無いはずだが、そこは次ループで判定される
+      console.log("No children. Go next loop");
+      allTreePtr = nextNode;
+    }
+
+    // resultTreePtrのポインタを移動
+    var tmpObj = null;
+    if (resultTreePtr[node]['children']) {
+      resultTreePtr[node]['children'] = {}; // childrenを空にしておく
+      tmpObj = resultTreePtr[node]['children'];
+
+    } else {
+      tmpObj = resultTreePtr[node];
+    }
+    resultTreePtr = tmpObj;
+  }
 }
+
 function mock_judgeAuthorizeToken(token) {
   //TODO: empty func. for now, return SUCCESS if token exists.
   var user_token = token['authorization'];
