@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title> VIAS test </title>
+<script src="vias.js"></script>
+</head>
+
+<body>
+
+</body>
+<script>
+  var VSS_SPEED = 'Signal.Drivetrain.Transmission.Speed';
+  var VISS_IP = 'wwwivi';
+  var VISS_PORT='3000';
+  const viscOption = {
+    'host': VISS_IP,
+    'protocol': 'ws://',
+    'port': VISS_PORT
+  };
+
+  var vias = new VISClient( viscOption );
+
+  const connectCallback = () => {
+
+    // get method test
+    /*
+    vias.get(VSS_SPEED,
+      function(_val) {
+        console.log(`get:success: val= ${_val}`);
+      },
+      function(_err) {
+        console.err(`get:failure: err= ${_err.number}`);
+      });
+    */
+
+    // subscribe method test
+    var count = 0;
+    var subscription = vias.subscribe(VSS_SPEED,
+      function(_val) {
+        console.log(`subscribe:success: val= ${_val}`);
+
+        count++;
+        if(count >= 10) {
+          vias.unsubscribe(subscription,
+            () => {
+              console.log(`unsubscribe:success`);
+            },
+            (_err) => {
+              console.log(`unsubscribe:failure err=${_err.number}`);
+            });
+        }
+      },
+      function(_err) {
+        console.err(`subscribe:failure: err= ${_err.number}`);
+      });
+
+  };
+  const errorCallback = (_err) => {
+    console.err(`Error : ${_err.number}`);
+
+  };
+
+  vias.connect(connectCallback, errorCallback);
+
+</script>
+</html>
