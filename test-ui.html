@@ -46,15 +46,15 @@
 
 <body>
   <header id="header">
-    <h3> Vehicle Signal Server Spec Trial Implementaion </h3>
+    <h3> Vehicle information Service Spec Test Client </h3>
     <span id="server_info"></span>
     <br>
   </header>
 
   <div id="wrapper">
     <main id="main">
-      <button onclick="wsConnect();">ws connect</button>
-      <button onclick="wsDisconnect();">ws disconnect</button>
+      <button onclick="btnConnect();">ws connect</button>
+      <button onclick="btnDisconnect();">ws disconnect</button>
       <span class="val_area" id="msg_connect"></span>
 
       <br>
@@ -442,8 +442,8 @@
   // ================
   // == UI handler ==
   // ================
-  function wsConnect() {
-    showInMsgArea("wsConnect:");
+  function btnConnect() {
+    showInMsgArea("btnConnect:");
     if (g_vehicle != null) {
       showInMsgArea("--:WebSocket already open");
       return;
@@ -457,8 +457,8 @@
     g_vehicle.onmessage = onWsMessage;
     showConnectMsg("WS Connected");
   }
-  function wsDisconnect() {
-    showInMsgArea("wsDisconnect:");
+  function btnDisconnect() {
+    showInMsgArea("btnDisconnect:");
     if (g_vehicle === null) {
       showInMsgArea("--:WebSocket not connected");
       return;
