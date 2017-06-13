@@ -377,6 +377,7 @@ var VISClient = (function() {
         // unsubscribe failed
         // - delete unsubscribe request from requestTable
         g_reqDict.deleteRequest(reqId);
+        errCb(msg.error);
 
       // 成功ケース
       //  sub request を reqDictから削除
@@ -386,12 +387,11 @@ var VISClient = (function() {
         // unsubscribe success
         // - delete subscribe request from requestTable
         // - delete unsubscribe request from requestTable
-
         var targ_svrSubId = msg.subscriptionId; //unsub対象のsubscribeのsubId
         var targ_reqId = g_reqDict.convertSvrSubIdToReqId(targ_svrSubId); //subscribeのreqId
-
         g_reqDict.deleteRequest(targ_reqId); // delete subscribe's entry in reqTable
         g_reqDict.deleteRequest(reqId);      // delete unsub's entry in reqTable
+        sucCb();
       }
     }
   }
