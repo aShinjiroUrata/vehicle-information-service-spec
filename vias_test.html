@@ -33,13 +33,19 @@
 <button type="button" class="btn" id="idBtnSetDoorlockFalse">Set Doorlock False</button><br>
 <button type="button" class="btn" id="idBtnGetDoorlock">Get Doorlock</button><br>
 <span id="idSpanDoorlock" >* Doorlock = Row2 Right Door's lock</span>
+<br>
+<br>
+<button type="button" class="btn" id="idBtnAuthorize">Authorize</button><br>
+<br>
+<button type="button" class="btn" id="idBtnGetVss">getVss</button><br>
+
 
 </body>
 <script>
 var VSS_SPEED = 'Signal.Drivetrain.Transmission.Speed';
 var VSS_RPM = 'Signal.Drivetrain.InternalCombustionEngine.RPM';
-
-var VSS_DOORLOCK = 'Signal.Cabin.Door.Row2.Right.IsLocked';
+var VSS_DOORLOCK = 'Signal.Cabin.Door.Row1.Right.IsLocked';
+//var VSS_DOORLOCK = 'Signal.Cabin.Door.Row2.Right.IsLocked';
 
 var VISS_IP = 'wwwivi';
 var VISS_PORT='3000';
@@ -73,7 +79,6 @@ const disconnectCb = (_msg) => {
 };
 const disconnectErrCb = (_err) => {
   console.error(`Disconnect: Error : ${_err.number}`);
-  //bConnected = false; // don't change
 };
 
 function doConnect() {
@@ -114,19 +119,15 @@ function doSubscribe(_refval) {
     console.log("WebSocket not connected");
     return;
   }
-
-  _refval.subId = vias.subscribe(_refval.path,
-    function(_val) {
-      console.log(`subscribe:success: val= ${_val}`);
-    },
-    function(_err) {
-      console.error(`subscribe:failure: err= ${_err.number}`);
-    });
+  _refval.subId = vias.subscribe(_refval.path, _refval.sucCb, _refval.errCb);
 }
 function doSubscribeSpeed() {
   var refval = {};
   refval.path = VSS_SPEED;
   refval.subId = subId_speed;
+  refval.sucCb = function(_val) { console.log(`subscribe speed: success: val= ${_val}`); };
+  refval.errCb = function(_err) { console.error(`subscribe speed: failure: err= ${_err.number}`); };
+
   doSubscribe(refval);
   subId_speed = refval.subId;
 }
@@ -134,6 +135,9 @@ function doSubscribeRPM() {
   var refval = {};
   refval.path = VSS_RPM;
   refval.subId = subId_RPM;
+  refval.sucCb = function(_val) { console.log(`subscribe RPM: success: val= ${_val}`); };
+  refval.errCb = function(_err) { console.error(`subscribe RPM: failure: err= ${_err.number}`); };
+
   doSubscribe(refval);
   subId_RPM = refval.subId;
 }
@@ -212,8 +216,8 @@ function doSetDoorlockTrue() {
   }
   // set method test
   vias.set(VSS_DOORLOCK, 'true',
-    function(_val) {
-      console.log(`set doorlock:success: val= ${_val}`);
+    function() {
+      console.log(`set doorlock:success`);
     },
     function(_err) {
       console.error(`set doorlock:failure: err= ${_err.number}`);
@@ -226,27 +230,67 @@ function doSetDoorlockFalse() {
   }
   // set method test
   vias.set(VSS_DOORLOCK, 'false',
-    function(_val) {
-      console.log(`set doorlock:success: val= ${_val}`);
+    function() {
+      console.log(`set doorlock:success`);
     },
     function(_err) {
       console.error(`set doorlock:failure: err= ${_err.number}`);
+    });
+}
+function doAuthorize() {
+  if (!bConnected) {
+    console.log("WebSocket not connected");
+    return;
+  }
+  // get method test
+  var userToken = 'token_valid';    // fake token for test
+  var deviceToken = 'token_valid';  // fake token for test
+  var tokens = {"authorization"     : userToken,
+                "www-vehicle-device": deviceToken};
+  vias.authorize(tokens,
+    function(_ttl) {
+      console.log(`authorize :success: TTL= ${_ttl}`);
+    },
+    function(_err) {
+      console.error(`authorize :failure: err= ${_err.number}`);
+    });
+}
+function doGetVss() {
+  if (!bConnected) {
+    console.log("WebSocket not connected");
+    return;
+  }
+  // get method test
+  var path = 'Attribute.Body';
+  console.log('getVSS: path=' + path);
+  vias.getVss(path,
+    function(_vss) {
+      console.log(`getVSS :success: vss= ${_vss}`);
+    },
+    function(_err) {
+      console.error(`getVSS :failure: err= ${_err.number}`);
     });
 }
 
 (function() {
   document.getElementById('idBtnConnect').addEventListener('click', doConnect);
   document.getElementById('idBtnDisconnect').addEventListener('click', doDisconnect);
+
   document.getElementById('idBtnGetSpeed').addEventListener('click', doGetSpeed);
+
   document.getElementById('idBtnSubscribeSpeed').addEventListener('click', doSubscribeSpeed);
   document.getElementById('idBtnUnsubscribeSpeed').addEventListener('click', doUnsubscribeSpeed);
   document.getElementById('idBtnSubscribeRPM').addEventListener('click', doSubscribeRPM);
+
   document.getElementById('idBtnUnsubscribeRPM').addEventListener('click', doUnsubscribeRPM);
   document.getElementById('idBtnUnsubscribeAll').addEventListener('click', doUnsubscribeAll);
 
-  document.getElementById('idBtnGetDoorlock').addEventListener('click', doGetDoorlock);
   document.getElementById('idBtnSetDoorlockTrue').addEventListener('click', doSetDoorlockTrue);
   document.getElementById('idBtnSetDoorlockFalse').addEventListener('click', doSetDoorlockFalse);
+  document.getElementById('idBtnGetDoorlock').addEventListener('click', doGetDoorlock);
+
+  document.getElementById('idBtnAuthorize').addEventListener('click', doAuthorize);
+  document.getElementById('idBtnGetVss').addEventListener('click', doGetVss);
 
 })();
 

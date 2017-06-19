@@ -354,11 +354,41 @@ var VISClient = (function() {
     dbgLog("--: ==> " + json_str);
   };
 
-  p.authorize = function() {
-    //TODO:
+  p.authorize = function(_tokens, _sucCb, _errCb) {
+    dbgLog("authorize: token=" + _tokens);
+    if (connection == null || connection.readyState != WS_OPEN) {
+      var err = createErrObj(-1, "connetion not ready","");
+      setTimeout(function(){_errCb(err);},1);
+      return;
+    }
+    // set用JSONを作成
+    var reqId = issueNewReqId();
+    var req = {"action": "authorize", "tokens": _tokens, "requestId":reqId};
+    var obj = {"reqObj": req, "sucCb": _sucCb, "errCb": _errCb};
+    g_reqDict.addRequest(reqId, obj);
+    // ws で送付
+    var json_str = JSON.stringify(req);
+    connection.send(json_str);
+    dbgLog("--: ==> " + json_str);
+
   };
-  p.getVSS = function() {
-    //TODO:
+  p.getVss = function(_path, _sucCb, _errCb) {
+    dbgLog("getVSS: path=" + _path);
+    if (connection == null || connection.readyState != WS_OPEN) {
+      var err = createErrObj(-1, "connetion not ready","");
+      setTimeout(function(){_errCb(err);},1);
+      return;
+    }
+    // set用JSONを作成
+    var reqId = issueNewReqId();
+    var req = {"action": "getVSS", "path": _path, "requestId":reqId};
+    var obj = {"reqObj": req, "sucCb": _sucCb, "errCb": _errCb};
+    g_reqDict.addRequest(reqId, obj);
+    // ws で送付
+    var json_str = JSON.stringify(req);
+    connection.send(json_str);
+    dbgLog("--: ==> " + json_str);
+
   };
   p.set = function(_path, _val, _sucCb, _errCb) {
     dbgLog("set: path=" + _path + ", value=" + _val);
@@ -504,7 +534,7 @@ var VISClient = (function() {
       if (isSetSuccessResponse(msg)) {
         dbgLog("Set: response success");
         // get のsuccess では value のみ返す
-        sucCb(msg.value);
+        sucCb();
 
       } else if (isSetErrorResponse(msg)) {
         dbgLog("Set: response fail");
@@ -607,11 +637,25 @@ var VISClient = (function() {
       }
 
     } else if (action === "authorize") {
-      dbgLog("WsMsg:authorize: received");
-      //TODO:
+      if (isAuthorizeSuccessResponse(msg)) {
+        dbgLog("authorize: response: success");
+        sucCb(msg.TTL);
+      } else if (isAuthorizeErrorResponse(msg)) {
+        dbgLog("authorize: response: failure");
+        errCb(msg.error);
+      }
+      g_reqDict.deleteRequest(reqId);      // delete unsub's entry in reqTable
+
     } else if (action === "getVSS") {
-      dbgLog("WsMsg:getVSS: received");
-      //TODO:
+      if (isVssSuccessResponse(msg)) {
+        dbgLog("getVSS: response: success");
+        var vss = JSON.stringify(msg.vss);
+        sucCb(vss);
+      } else if (isVssErrorResponse(msg)) {
+        dbgLog("getVSS: response: success");
+        errCb(msg.error);
+      }
+      g_reqDict.deleteRequest(reqId);      // delete unsub's entry in reqTable
     }
   }
 
@@ -701,6 +745,39 @@ var VISClient = (function() {
     // following members not exist: value, (requestId), (action)
     if (msg.subscriptionId != undefined && msg.error != undefined &&
         msg.value == undefined)
+      return true;
+    else
+      return false;
+  }
+
+  // == authorize helper
+  // Judge returned Json message's type
+  function isAuthorizeSuccessResponse(msg) {
+    if (msg.action === "authorize" && msg.requestId != undefined && msg.TTL != undefined &&
+        msg.error == undefined)
+      return true;
+    else
+      return false;
+  }
+  function isAuthorizeErrorResponse(msg) {
+    if (msg.action === "authorize" && msg.requestId != undefined && msg.TTL == undefined &&
+        msg.error != undefined)
+      return true;
+    else
+      return false;
+  }
+  // == getVSS helper
+  // Judge returned Json message's type
+  function isVssSuccessResponse(msg) {
+    if (msg.action === "getVSS" && msg.requestId != undefined && msg.vss != undefined &&
+        msg.error == undefined)
+      return true;
+    else
+      return false;
+  }
+  function isVssErrorResponse(msg) {
+    if (msg.action === "getVSS" && msg.requestId != undefined && msg.vss == undefined &&
+        msg.error != undefined)
       return true;
     else
       return false;
