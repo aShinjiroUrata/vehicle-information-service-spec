@@ -6,7 +6,7 @@
 <script src="vias.js"></script>
 <style>
 .btn {
-  width:120px;
+  width:180px;
 }
 </style>
 </head>
@@ -15,14 +15,23 @@
 
 <button type="button" class="btn" id="idBtnConnect">Connect</button><br>
 <button type="button" class="btn" id="idBtnDisconnect">Disconnect</button><br>
-<button type="button" class="btn" id="idBtnGet">Get</button><br>
-<button type="button" class="btn" id="idBtnSubscribe">Subscribe</button><br>
-<button type="button" class="btn" id="idBtnUnsubscribe">Unsubscribe</button><br>
+<br>
+<button type="button" class="btn" id="idBtnGetSpeed">Get Speed</button><br>
+<br>
+<button type="button" class="btn" id="idBtnSubscribeSpeed">Subscribe Speed</button><br>
+<button type="button" class="btn" id="idBtnUnsubscribeSpeed">Unsubscribe Speed</button><br>
+<br>
+<button type="button" class="btn" id="idBtnSubscribeRPM">Subscribe RPM</button><br>
+<button type="button" class="btn" id="idBtnUnsubscribeRPM">Unsubscribe RPM</button><br>
+<br>
+<button type="button" class="btn" id="idBtnUnsubscribeAll">UnsubscribeAll</button><br>
 
 
 </body>
 <script>
 var VSS_SPEED = 'Signal.Drivetrain.Transmission.Speed';
+var VSS_RPM = 'Signal.Drivetrain.InternalCombustionEngine.RPM';
+
 var VISS_IP = 'wwwivi';
 var VISS_PORT='3000';
 const viscOption = {
@@ -31,7 +40,9 @@ const viscOption = {
   'port': VISS_PORT
 };
 
-var subscription = null;
+var subId_speed = null;
+var subId_RPM = null;
+
 var vias = new VISClient( viscOption );
 var bConnected = false;
 
@@ -40,11 +51,15 @@ const connectCb = () => {
   bConnected = true;
 };
 const connectErrCb = (_err) => {
-  console.error(`Connect: Error : ${_err.number}`);
+  //console.error(`Connect: Error : ${_err.number}`);
+  console.log('Connect: Error :' + _err.number );
   bConnected = false;
 };
-const disconnectCb = () => {
-  console.log(`Disconnect: Success`);
+// TODO: errorの返し方はどうする？
+// このcallback は定義上は引数なし。
+// disconnect 成功時のcallback. err というよりは msg を返したい
+const disconnectCb = (_msg) => {
+  console.log(`Disconnect: Success` + _msg);
   bConnected = false;
 };
 const disconnectErrCb = (_err) => {
@@ -69,7 +84,7 @@ function doDisconnect() {
   vias.disconnect(disconnectCb, disconnectErrCb);
 }
 
-function doGet() {
+function doGetSpeed() {
 
   if (!bConnected) {
     console.log("WebSocket not connected");
@@ -85,46 +100,98 @@ function doGet() {
     });
 }
 
-function doSubscribe() {
+function doSubscribe(_refval) {
   if (!bConnected) {
     console.log("WebSocket not connected");
     return;
   }
 
-  subscription = vias.subscribe(VSS_SPEED,
+  _refval.subId = vias.subscribe(_refval.path,
     function(_val) {
       console.log(`subscribe:success: val= ${_val}`);
     },
     function(_err) {
       console.error(`subscribe:failure: err= ${_err.number}`);
     });
-
+}
+function doSubscribeSpeed() {
+  var refval = {};
+  refval.path = VSS_SPEED;
+  refval.subId = subId_speed;
+  doSubscribe(refval);
+  subId_speed = refval.subId;
+}
+function doSubscribeRPM() {
+  var refval = {};
+  refval.path = VSS_RPM;
+  refval.subId = subId_RPM;
+  doSubscribe(refval);
+  subId_RPM = refval.subId;
 }
 
-function doUnsubscribe() {
+function doUnsubscribe(_refval) {
   if (!bConnected) {
     console.log("WebSocket not connected");
     return;
   }
 
-  if (subscription) {
-    vias.unsubscribe(subscription,
-      () => {
-        console.log(`unsubscribe:success`);
-        subscription = null;
-      },
-      (_err) => {
-        console.error(`unsubscribe:failure err=${_err.number}`);
-      });
+  if (_refval.subId) {
+    vias.unsubscribe(_refval.subId,
+      _refval.sucCb, _refval.errCb);
   }
+}
+
+function doUnsubscribeSpeed() {
+  var refval = {};
+  refval.subId = subId_speed;
+  refval.sucCb = function() {
+    console.log('unsubscribe:success');
+    subId_speed = null;
+  };
+  refval.errCb = function(_err) {
+    console.error(`unsubscribe:failure err=${_err.number}`);
+  };
+  doUnsubscribe(refval);
+}
+function doUnsubscribeRPM() {
+  var refval = {};
+  refval.subId = subId_RPM;
+  refval.sucCb = function() {
+    console.log('unsubscribe:success');
+    subId_RPM = null;
+  };
+  refval.errCb = function(_err) {
+    console.error(`unsubscribe:failure err=${_err.number}`);
+  };
+  doUnsubscribe(refval);
+}
+
+function doUnsubscribeAll() {
+  if (!bConnected) {
+    console.log("WebSocket not connected");
+    return;
+  }
+
+  vias.unsubscribeAll(
+    function() {
+      console.log('unsubscribeAll:success');
+    },
+    function(_err) {
+      console.error(`unsubscribeAll:failure err=${_err.number}`);
+    }
+  );
 }
 
 (function() {
   document.getElementById('idBtnConnect').addEventListener('click', doConnect);
   document.getElementById('idBtnDisconnect').addEventListener('click', doDisconnect);
-  document.getElementById('idBtnGet').addEventListener('click', doGet);
-  document.getElementById('idBtnSubscribe').addEventListener('click', doSubscribe);
-  document.getElementById('idBtnUnsubscribe').addEventListener('click', doUnsubscribe);
+  document.getElementById('idBtnGetSpeed').addEventListener('click', doGetSpeed);
+  document.getElementById('idBtnSubscribeSpeed').addEventListener('click', doSubscribeSpeed);
+  document.getElementById('idBtnUnsubscribeSpeed').addEventListener('click', doUnsubscribeSpeed);
+  document.getElementById('idBtnSubscribeRPM').addEventListener('click', doSubscribeRPM);
+  document.getElementById('idBtnUnsubscribeRPM').addEventListener('click', doUnsubscribeRPM);
+  document.getElementById('idBtnUnsubscribeAll').addEventListener('click', doUnsubscribeAll);
+
 })();
 
 </script>
