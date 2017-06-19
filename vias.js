@@ -205,10 +205,8 @@ var VISClient = (function() {
     // TODO: connect の失敗ケースはどんな場合？
     if (connection != null) {
       //既にconnectionがあるので、エラーを返す
-      var err = {};
-      err.number = -1; //TODO: 正しいエラーコードは？
-      err.reason = "Connection already exists."
-      _errCb(err);
+      var err = createErrObj(-1, "connetion already exists","");  //TODO: 正しいエラーコードは？
+      setTimeout(function(){_errCb(err);},1);
       return;
     }
 
@@ -233,11 +231,9 @@ var VISClient = (function() {
   };
   p.disconnect = function(_sucCb, _errCb) {
     if (connection == null) {
-      var err = {};
-      err.number = -1;
-      //TODO: temporal msg. need to update to correct msg.
-      err.reason = 'Connection not established';
-      _errCb(err);
+      var err = createErrObj(-1, "connetion not exists","");  //TODO: 正しいエラーコードは？
+      setTimeout(function(){_errCb(err);},1);
+      return;
     }
     //wsCloseCb = _sucCb; //onclose でコールバックを呼べるようにprivateメンバに設定しておく
     onDisconnectSucCb = _sucCb; //onclose でコールバックを呼べるようにprivateメンバに設定しておく
@@ -247,6 +243,8 @@ var VISClient = (function() {
     dbgLog("get: path=" + _path);
     if (connection == null || connection.readyState != WS_OPEN) {
       // TODO: エラーを返す
+      var err = createErrObj(-1, "connetion not exists","");  //TODO: 正しいエラーコードは？
+      setTimeout(function(){_errCb(err);},1);
       return;
     }
 
@@ -268,6 +266,8 @@ var VISClient = (function() {
     dbgLog("subscribe: path=" + _path);
     if (connection == null || connection.readyState != WS_OPEN) {
       // TODO: エラーを返す
+      var err = createErrObj(-1, "connetion not exists","");  //TODO: 正しいエラーコードは？
+      setTimeout(function(){_errCb(err);},1);
       return;
     }
 
@@ -307,6 +307,8 @@ var VISClient = (function() {
     dbgLog("unsubscribe: cliSubId=" + _cliSubId);
     if (connection == null || connection.readyState != WS_OPEN) {
       // TODO: エラーを返す
+      var err = createErrObj(-1, "connetion not exists","");  //TODO: 正しいエラーコードは？
+      setTimeout(function(){_errCb(err);},1);
       return;
     }
 
@@ -333,7 +335,9 @@ var VISClient = (function() {
     //TODO:surata: デバッガで追って確認のこと！
     dbgLog("unsubscribeAll");
     if (connection == null || connection.readyState != WS_OPEN) {
-      // TODO: エラーを返す
+      // TODO: 正しいエラーを返す
+      var err = createErrObj(-1, "connetion not exists","");  //TODO: 正しいエラーコードは？
+      setTimeout(function(){_errCb(err);},1);
       return;
     }
 
@@ -356,8 +360,22 @@ var VISClient = (function() {
   p.getVSS = function() {
     //TODO:
   };
-  p.set = function() {
-    //TODO:
+  p.set = function(_path, _val, _sucCb, _errCb) {
+    dbgLog("set: path=" + _path + ", value=" + _val);
+    if (connection == null || connection.readyState != WS_OPEN) {
+      var err = createErrObj(-1, "connetion not ready","");
+      setTimeout(function(){_errCb(err);},1);
+      return;
+    }
+    // set用JSONを作成
+    var reqId = issueNewReqId();
+    var req = {"action": "set", "path": _path, "value": _val, "requestId":reqId};
+    var obj = {"reqObj": req, "sucCb": _sucCb, "errCb": _errCb};
+    g_reqDict.addRequest(reqId, obj);
+    // ws で送付
+    var json_str = JSON.stringify(req);
+    connection.send(json_str);
+    dbgLog("--: ==> " + json_str);
   };
 
   // ====================
@@ -473,7 +491,7 @@ var VISClient = (function() {
         // get のsuccess では value のみ返す
         sucCb(msg.value);
 
-      } else if (this.isGetErrorResponse(msg)) {
+      } else if (isGetErrorResponse(msg)) {
         dbgLog("Get: response fail");
         errCb(msg.error);
       }
@@ -483,6 +501,17 @@ var VISClient = (function() {
     // case of 'set'
     } else if (action === "set") {
       //TODO:
+      if (isSetSuccessResponse(msg)) {
+        dbgLog("Set: response success");
+        // get のsuccess では value のみ返す
+        sucCb(msg.value);
+
+      } else if (isSetErrorResponse(msg)) {
+        dbgLog("Set: response fail");
+        errCb(msg.error);
+      }
+      // delete request from requestHash. delete even in error case
+      g_reqDict.deleteRequest(reqId);
 
     } else if (action === "subscribe") {
       // subId 通知の場合
@@ -611,6 +640,27 @@ var VISClient = (function() {
     else
       return false;
   }
+  // == set helper
+  function isSetSuccessResponse(msg) {
+    // This is setSuccessResponse if ...
+    // must exist    : action, requestId, timestamp
+    // must not exist: error, value
+    if (msg.action === "set" && msg.requestId != undefined && msg.timestamp != undefined &&
+        msg.value == undefined && msg.error == undefined)
+      return true;
+    else
+      return false;
+  }
+  function isSetErrorResponse(msg) {
+    // This is setErrorResponse if ...
+    // must exist    : action, requestId, error, timestamp
+    // must not exist: value
+    if (msg.action === 'set' && msg.requestId != undefined && msg.error != undefined &&
+        msg.timestamp != undefined && msg.value == undefined)
+      return true;
+    else
+      return false;
+  }
 
   // == subscribe helper
   // TODO: better to verify with json shema?
@@ -672,6 +722,19 @@ var VISClient = (function() {
     var strength = 1000;
     var uniq = new Date().getTime().toString(16) + Math.floor(strength*Math.random()).toString(16);
     return "clisubid-"+uniq;
+  }
+  function getUnixEpochTimestamp() {
+    // get mili sec unix epoch string
+    var ts = new Date().getTime().toString(10);
+    return ts;
+  }
+  function createErrObj(_num, _reason, _message) {
+    var err = {};
+    err.number = _num;
+    err.reason = _reason;
+    err.message = _message;
+    err.timeStamp = getUnixEpochTimestamp();
+    return err;
   }
   function dbgLog(_msg) {
     //console.log("[VIAS]:"+_msg);

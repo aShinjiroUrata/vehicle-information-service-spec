@@ -8,6 +8,9 @@
 .btn {
   width:180px;
 }
+#idSpanDoorlock {
+  font-size:14px;
+}
 </style>
 </head>
 
@@ -25,12 +28,18 @@
 <button type="button" class="btn" id="idBtnUnsubscribeRPM">Unsubscribe RPM</button><br>
 <br>
 <button type="button" class="btn" id="idBtnUnsubscribeAll">UnsubscribeAll</button><br>
-
+<br>
+<button type="button" class="btn" id="idBtnSetDoorlockTrue">Set Doorlock True</button><br>
+<button type="button" class="btn" id="idBtnSetDoorlockFalse">Set Doorlock False</button><br>
+<button type="button" class="btn" id="idBtnGetDoorlock">Get Doorlock</button><br>
+<span id="idSpanDoorlock" >* Doorlock = Row2 Right Door's lock</span>
 
 </body>
 <script>
 var VSS_SPEED = 'Signal.Drivetrain.Transmission.Speed';
 var VSS_RPM = 'Signal.Drivetrain.InternalCombustionEngine.RPM';
+
+var VSS_DOORLOCK = 'Signal.Cabin.Door.Row2.Right.IsLocked';
 
 var VISS_IP = 'wwwivi';
 var VISS_PORT='3000';
@@ -93,10 +102,10 @@ function doGetSpeed() {
   // get method test
   vias.get(VSS_SPEED,
     function(_val) {
-      console.log(`get:success: val= ${_val}`);
+      console.log(`get speed:success: val= ${_val}`);
     },
     function(_err) {
-      console.error(`get:failure: err= ${_err.number}`);
+      console.error(`get speed:failure: err= ${_err.number}`);
     });
 }
 
@@ -182,6 +191,49 @@ function doUnsubscribeAll() {
   );
 }
 
+function doGetDoorlock() {
+  if (!bConnected) {
+    console.log("WebSocket not connected");
+    return;
+  }
+  // get method test
+  vias.get(VSS_DOORLOCK,
+    function(_val) {
+      console.log(`get doorlock:success: val= ${_val}`);
+    },
+    function(_err) {
+      console.error(`get doorlock:failure: err= ${_err.number}`);
+    });
+}
+function doSetDoorlockTrue() {
+  if (!bConnected) {
+    console.log("WebSocket not connected");
+    return;
+  }
+  // set method test
+  vias.set(VSS_DOORLOCK, 'true',
+    function(_val) {
+      console.log(`set doorlock:success: val= ${_val}`);
+    },
+    function(_err) {
+      console.error(`set doorlock:failure: err= ${_err.number}`);
+    });
+}
+function doSetDoorlockFalse() {
+  if (!bConnected) {
+    console.log("WebSocket not connected");
+    return;
+  }
+  // set method test
+  vias.set(VSS_DOORLOCK, 'false',
+    function(_val) {
+      console.log(`set doorlock:success: val= ${_val}`);
+    },
+    function(_err) {
+      console.error(`set doorlock:failure: err= ${_err.number}`);
+    });
+}
+
 (function() {
   document.getElementById('idBtnConnect').addEventListener('click', doConnect);
   document.getElementById('idBtnDisconnect').addEventListener('click', doDisconnect);
@@ -191,6 +243,10 @@ function doUnsubscribeAll() {
   document.getElementById('idBtnSubscribeRPM').addEventListener('click', doSubscribeRPM);
   document.getElementById('idBtnUnsubscribeRPM').addEventListener('click', doUnsubscribeRPM);
   document.getElementById('idBtnUnsubscribeAll').addEventListener('click', doUnsubscribeAll);
+
+  document.getElementById('idBtnGetDoorlock').addEventListener('click', doGetDoorlock);
+  document.getElementById('idBtnSetDoorlockTrue').addEventListener('click', doSetDoorlockTrue);
+  document.getElementById('idBtnSetDoorlockFalse').addEventListener('click', doSetDoorlockFalse);
 
 })();
 
