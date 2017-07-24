@@ -1,14 +1,16 @@
 #!/bin/bash
 
-forever start mockDataSrc.js &
+http-server . -p 8081 -d false > log.txt 2>&1 &
+echo "local http server started"
 
+forever start ./mockDataSrc.js &
+echo "mockDataSrc started"
 sleep 2s
 
-forever start  visSvr.js &
+forever start  ./visSvr.js &
+echo "visSvr started"
 
-forever start ./httpsvr_start.js
-
-sleep 2s
+sleep 6s
 
 ps aux | grep node &
 
