@@ -129,13 +129,13 @@ function initDataObj(_vss) {
   Object.keys(root).forEach(function(key) {
     var node = root[key];
     //console.log("\nroot=>key = " + key);
-    traverse(key, node, '', leafCallback, dbg_depth);
+    traverse(key, node, null, '', leafCallback, dbg_depth);
   });
 
   return root;
 
-  function leafCallback(_key, _node, _path) {
-    addInitValue(_key, _node, _path);
+  function leafCallback(_key, _srcNode, _path) {
+    addInitValue(_key, _srcNode, _path);
   }
 
   // 各データ毎に適した初期値を設定する
@@ -211,28 +211,24 @@ function updateDataObj(_dataObj, _updateList) {
 
 // dataObjからVISS送付用のJSONを作成する
 function generatePushJson(_dataObj) {
-
-  //dataObjをtraverseして、push用Jsonを作成する
   var root = _dataObj;
-  var resJson = [];
+  var resObj  = {};
   var date = new Date();
   var ts = date.getTime();
   var timestamp = new Date().getTime().toString(10);
   var dbg_depth = 0;
 
-  Object.keys(root).forEach(function(key) {
-    var node = root[key];
-    traverse(key, node, '', leafCallback, dbg_depth);
-  });
+  Object.keys(root).forEach(
+    function(key) {
+      var targNode = resObj;
+      var srcNode = root[key];
+      traverse(key, srcNode, targNode, '', leafCallback, dbg_depth);
+    }
+  );
+  return {"action":"data", "data":resObj};
 
-  return {"data":resJson};
-
-  function leafCallback(_key, _node, _path) {
-    var json = {
-      'path': _path,
-      'value': _node.value,
-      'timestamp': timestamp};
-    resJson.push(json);
+  function leafCallback(_key, _srcNode, _targNode,  _path) {
+    _targNode[_key]  = {'value':_srcNode.value, 'timestamp':timestamp};
   }
 }
 
@@ -296,30 +292,46 @@ function getErrorObj(errValue) {
 // === Utility funcs ===
 // =====================
 
+function dbg_strConcat(_str, num) {
+  var res = "";
+  for (var i=0; i<num; i++)
+    res = res + _str;
+  return res;
+}
+
 // VSS object の tree をなめる動作
-function traverse(_key, _node, _path, _leafCallback, _depth) {
+function traverse(_key, _srcNode, _targNode, _path, _leafCallback, _depth) {
+  //var spacer = dbg_strConcat("> ", _depth);
+  //console.log("traverse: "+ spacer + _key+" type: "+_srcNode.type);
+
+  var targNode = null;
   var depth = _depth+1;
   var path = _path=='' ? _key : _path+'.'+_key;
-  if (_node.type == undefined) {
+
+  if (_srcNode.type == undefined) {
     return;
   }
+  if (_targNode != undefined && _targNode != null) {
+    _targNode[_key] = {};
+    targNode = _targNode[_key];
+  }
 
-  if (_node.type === 'branch') {
-    //console.log( Array(depth+1).join('    ')+"branch:" + _key);
+  if (_srcNode.type === 'branch') {
     //branch case
-    if (_node.children) {
+    if (_srcNode.children) {
       // children以下の要素についてtraverseを行う
-      Object.keys(_node.children).forEach(function(key) {
-        var node = _node.children[key];
-        traverse(key, node, path, _leafCallback, depth);
+      Object.keys(_srcNode.children).forEach(function(key) {
+        var srcNode = _srcNode.children[key];
+        traverse(key, srcNode, targNode, path, _leafCallback, depth);
       });
     } else {
       //no children. do nothing.
     }
   } else {
     //leaf case
-    //console.log( Array(depth+1).join('    ')+"leaf:" + _key);
-    _leafCallback(_key, _node, path);
+    if (_leafCallback != null && _leafCallback != undefined) {
+      _leafCallback(_key, _srcNode, _targNode, path);
+    }
   }
 }
 

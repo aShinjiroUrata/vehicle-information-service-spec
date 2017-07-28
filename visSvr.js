@@ -652,11 +652,23 @@ function dataReceiveHandler(message) {
     printLog(LOG_QUIET,"  :Error = "+e);
     return;
   }
-  var dataObj = obj.data; // standard data pushed from dataSrc
-  var setObj = obj.set;   // response of set request
-  var vssObj = obj.vss;   // response of getVss request
-  var resObj;
+  //console.log("from dataSrc= " + message.substr(0,300));
 
+  var dataObj = null;
+  var setObj  = null;
+  var vssObj  = null;
+  if (obj.action === "data") {
+    dataObj = obj.data;
+  } else if (obj.action === "set") {
+    setObj = obj.set; //TODO: sync with acs vehicle data I/F document
+  } else if (obj.action === "vss") {
+    vssObj = obj.vss;
+  } else {
+    // irregular data. exit
+    return;
+  }
+
+  var resObj;
   var matchObj;
   var retObj, reqObj;
 
@@ -739,7 +751,7 @@ function dataReceiveHandler(message) {
         //       for now, treat path just as simple string.
         //       there should be better way to handle VSS tree structure.
         //       use hash or index or something.
-        if ((matchObj = matchPath(reqObj, dataObj)) != undefined) {
+        if ((matchObj = matchPathJson(reqObj, dataObj)) != null) {
           if (reqObj.action === "get") {
             // send back 'getSuccessResponse'
             retObj = createGetSuccessResponse(reqObj.requestId, matchObj.value, matchObj.timestamp);
@@ -763,15 +775,26 @@ function dataReceiveHandler(message) {
   }
 }
 
-function matchPath(reqObj, dataObj) {
-  //TODO: find more efficient matching method
-  //    : as 1st version, take simplest way
-  for (var i in dataObj) {
-    if (dataObj[i].path === reqObj.path) {
-      return dataObj[i];
+function matchPathJson(_reqObj, _dataObj) {
+  var reqPath = _reqObj.path;
+  var arrPath = reqPath.split(".");
+  var targObj = _dataObj;
+
+  for (var i=0; i<arrPath.length; i++) {
+    //console.log("matching: key= " + arrPath[i]);
+    if (targObj[arrPath[i]] == undefined) {
+      //The specified path is not containted in dataObj
+      printLog(LOG_DEFAULT,"  :matchPathJson fail");
+      return null;
+    } else {
+      //printLog(LOG_DEFAULT,"  :matching: value= " + JSON.stringify(targObj[arrPath[i]]).substr(0,300) );
+      targObj = targObj[arrPath[i]];
+      if (i === arrPath.length-1) {
+        //printLog(LOG_DEFAULT,"  :matchPath:success: data= " + JSON.stringify(targObj));
+        return targObj;
+      }
     }
   }
-  return undefined;
 }
 
 function accessControlCheck(_path, _action, _authHash) {
