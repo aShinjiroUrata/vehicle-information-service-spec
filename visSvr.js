@@ -32,9 +32,9 @@ var dataSrc = EXT_MOCK_SERVER;
 //var dataSrc = EXT_SIP_SERVER;
 
 // == log level ==
-var LOG_QUIET = 0
+var LOG_QUIET = 0 // only important log will shown
 var LOG_DEFAULT = 1
-var LOG_VERBOSE = 2;
+var LOG_VERBOSE = 2; // not very important log will also shown
 var LOG_CUR_LEVEL = LOG_DEFAULT;
 
 // == Error value definition ==
@@ -43,6 +43,8 @@ var ERR_SUCCESS = 'success';
 var ERR_INVALID_TOKEN = 'invalid token';
 
 // Error from VISS spec
+// (for definition, refer VISS spec)
+// TODO: is this ok that these errors are indistinctive?
 var ERR_USER_FORBIDDEN   = '403';
 var ERR_USER_UNKNOWN     = '403';
 var ERR_DEVICE_FORBIDDEN = '403';
@@ -185,10 +187,10 @@ var g_extMockDataSrc = (function() {
       }
     },
     //send VSS json(full) request to mockDataSrc
-    sendVssRequest: function(obj, _reqId, _sessId) {
+    sendVSSRequest: function(obj, _reqId, _sessId) {
       if (m_conn != null) {
         var dataSrcReqId = this.createDataSrcReqId();
-        var sendObj = this.createExtMockSvrVssRequestJson(obj, dataSrcReqId);
+        var sendObj = this.createExtMockSvrVSSRequestJson(obj, dataSrcReqId);
         this.addDataSrcReqHash(dataSrcReqId, _reqId, _sessId);
         //printLog(LOG_DEFAULT,"  :sendObj="+JSON.stringify(sendObj));
         m_conn.sendUTF(JSON.stringify(sendObj));
@@ -201,15 +203,18 @@ var g_extMockDataSrc = (function() {
     },
 
     createExtMockSvrSetRequestJson: function(_obj, _dataSrcReqId) {
-      var retObj = {"action": "set", "path": _obj.path, "value": _obj.value,
-                    "dataSrcRequestId":_dataSrcReqId};
+      var retObj =  {"action": "set", "data":
+                      {"path": _obj.path,
+                       "value": _obj.value,
+                       "requestId":_dataSrcReqId}
+                    };
+
       return retObj;
     },
-    createExtMockSvrVssRequestJson: function(_obj, _dataSrcReqId) {
-      // TODO: need to specify path
-      var retObj = {"action": "getVSS",
-                    //"path": _obj.path,
-                    "dataSrcRequestId":_dataSrcReqId};
+    createExtMockSvrVSSRequestJson: function(_obj, _dataSrcReqId) {
+      // No need to specify path since, narrow down is done in visSvr side.
+      var retObj = {"action": "getVSS", "data": {
+                    "requestId":_dataSrcReqId}};
       return retObj;
     },
 
@@ -518,7 +523,7 @@ wssvr.on('connection', function(ws) {
       if (ret == false) {
         printLog(LOG_QUIET,"  :Failed to add 'get' info to requestTable.");
       }
-      printLog(LOG_DEFAULT,"  :get request registered. reqId=" + reqId + ", path=" + path);
+      printLog(LOG_VERBOSE,"  :get request registered. reqId=" + reqId + ", path=" + path);
 
     } else if (obj.action === "set") {
       printLog(LOG_DEFAULT,"  :action=" + obj.action);
@@ -539,7 +544,7 @@ wssvr.on('connection', function(ws) {
       } else {
         // TODO: for now support extMockDataSrc only. support other dataSrc when needed.
         g_extMockDataSrc.sendSetRequest(obj, reqId, _sessId);
-        printLog(LOG_DEFAULT,"  :set request registered. reqId=" + reqId + ", path=" + path);
+        printLog(LOG_VERBOSE,"  :set request registered. reqId=" + reqId + ", path=" + path);
       }
 
     } else if (obj.action === "authorize") {
@@ -568,8 +573,8 @@ wssvr.on('connection', function(ws) {
       var reqId = obj.requestId;
       var path = obj.path;
       var ret = _reqTable.addReqToTable(obj, null, null);
-      g_extMockDataSrc.sendVssRequest(obj, reqId, _sessId);
-      printLog(LOG_DEFAULT,"  :getVss request registered. reqId=" + reqId + ", path=" + path);
+      g_extMockDataSrc.sendVSSRequest(obj, reqId, _sessId);
+      printLog(LOG_VERBOSE,"  :getVSS request registered. reqId=" + reqId + ", path=" + path);
 
     // for 'subscribe'
     } else if (obj.action === "subscribe") {
@@ -660,9 +665,9 @@ function dataReceiveHandler(message) {
   if (obj.action === "data") {
     dataObj = obj.data;
   } else if (obj.action === "set") {
-    setObj = obj.set; //TODO: sync with acs vehicle data I/F document
-  } else if (obj.action === "vss") {
-    vssObj = obj.vss;
+    setObj = obj.data; //TODO: sync with acs vehicle data I/F document
+  } else if (obj.action === "getVSS") {
+    vssObj = obj.data;
   } else {
     // irregular data. exit
     return;
@@ -674,16 +679,18 @@ function dataReceiveHandler(message) {
 
   // if 'getVSS' or 'set' response exists..
   if (vssObj || setObj) {
-    //printLog(LOG_DEFAULT,"  :getVss message=" + JSON.stringify(vssObj).substr(0,200));
+    //printLog(LOG_DEFAULT,"  :getVSS message=" + JSON.stringify(vssObj).substr(0,200));
 
     //[TODO] vssObj setObj 両方あるケースはなかったか？
-    if (vssObj)
-      resObj = vssObj;
-    else
-      resObj = setObj;
+    var _dataSrcReqId = null;
+    if (vssObj) {
+      _dataSrcReqId = vssObj.requestId;
+    } else {
+      _dataSrcReqId = setObj.requestId;
+    }
 
     do { // for exitting by 'break'
-      var _dataSrcReqId = resObj.dataSrcRequestId;
+
       var _reqIdsessIdObj = g_extMockDataSrc.getReqIdSessIdObj(_dataSrcReqId);
       printLog(LOG_DEFAULT,"  :reqIdsessIdObj=" + JSON.stringify(_reqIdsessIdObj));
       if (_reqIdsessIdObj == undefined) {
@@ -699,23 +706,24 @@ function dataReceiveHandler(message) {
       var _ws = _sessObj.ws;
       var _reqObj = _reqTable.requestHash[_reqId];
 
-      // for getVss response
+      // for getVSS response
       if (vssObj) {
-        if (resObj.error != undefined) {
-          retObj = createVssErrorResponse(_reqObj.requestId, resObj.error);
+        if (vssObj.error != undefined) {
+          //TODO: test this case
+          retObj = createVSSErrorResponse(_reqObj.requestId, vssObj.error);
         } else {
-          //TODO: need to extract subtree under 'path'
-          console.log("> > > Entering extractPartialVss");
-          var targetVss = extractPartialVss(resObj.vss, _reqObj.path);
-          retObj = createVssSuccessResponse(_reqObj.requestId, targetVss);
+          printLog(LOG_DEFAULT, "  :> > > Entering extractPartialVSS");
+          var targetVSS = extractPartialVSS(vssObj.vss, _reqObj.path);
+          retObj = createVSSSuccessResponse(_reqObj.requestId, targetVSS);
         }
-        printLog(LOG_VERBOSE,"  :getVss response="+JSON.stringify(retObj).substr(0,3000));
+        printLog(LOG_VERBOSE,"  :getVSS response="+JSON.stringify(retObj).substr(0,3000));
+
       // for set response
       } else {
-        if (resObj.error != undefined) {
-          retObj = createSetErrorResponse(_reqObj.requestId, resObj.error, resObj.timestamp);
+        if (setObj.error != undefined) {
+          retObj = createSetErrorResponse(_reqObj.requestId, setObj.error, setObj.timestamp);
         } else {
-          retObj = createSetSuccessResponse(_reqObj.requestId, resObj.timestamp);
+          retObj = createSetSuccessResponse(_reqObj.requestId, setObj.timestamp);
         }
         printLog(LOG_VERBOSE,"  :set response="+JSON.stringify(retObj));
       }
@@ -798,20 +806,20 @@ function matchPathJson(_reqObj, _dataObj) {
 }
 
 function accessControlCheck(_path, _action, _authHash) {
-  printLog(LOG_DEFAULT,"  :accessControlCheck");
+  printLog(LOG_VERBOSE,"  :accessControlCheck");
   var _obj = _authHash.hash[_path];
-  printLog(LOG_DEFAULT,"  :hash=" + JSON.stringify( _authHash.hash  ));
+  printLog(LOG_VERBOSE,"  :hash=" + JSON.stringify( _authHash.hash  ));
 
-  printLog(LOG_DEFAULT,"  :_path=" + _path);
-  printLog(LOG_DEFAULT,"  :_action=" + _action);
-  printLog(LOG_DEFAULT,"  :_obj=" + _obj);
-  printLog(LOG_DEFAULT,"  :_obj=" + JSON.stringify(_obj));
+  printLog(LOG_VERBOSE,"  :_path=" + _path);
+  printLog(LOG_VERBOSE,"  :_action=" + _action);
+  printLog(LOG_VERBOSE,"  :_obj=" + _obj);
+  printLog(LOG_VERBOSE,"  :_obj=" + JSON.stringify(_obj));
 
   if (_obj == undefined) {
     return true;
   } else {
     var _status = _obj[_action];
-    printLog(LOG_DEFAULT,"  :_status=" + _status);
+    printLog(LOG_VERBOSE,"  :_status=" + _status);
     if (_status == undefined) {
       return false;
     } else if (_status == true) {
@@ -879,8 +887,9 @@ function printLog(lvl, msg) {
 // ==================
 
 // == extract partial vss from full-vss-tree by specifying 'path'
-function extractPartialVss(_objVssAll, _strPath) {
-
+function extractPartialVSS(_objVSSAll, _strPath) {
+  printLog(LOG_DEFAULT, "extractParialVSS: vss="
+            + JSON.stringify(_objVSSAll).substr(0,100) + " path="+_strPath);
   //pathの分類
   // a.fullpath
   // b.途中まで
@@ -888,22 +897,22 @@ function extractPartialVss(_objVssAll, _strPath) {
 
   // 手順
   // - _strPath を.で分割
-  // - _objVssAllをルートからたどっていく
-  // - _strPathの最後までたどれたら、_objVssAllは、_strPathを含んでいる
-  // - _objVssAllから_strPathに該当する部分ツリーを取り出す
+  // - _objVSSAllをルートからたどっていく
+  // - _strPathの最後までたどれたら、_objVSSAllは、_strPathを含んでいる
+  // - _objVSSAllから_strPathに該当する部分ツリーを取り出す
   // - それを返す
-  // - 指定した_strPathが_objVssAllに含まれない場合、nullを返す、でよい？
+  // - 指定した_strPathが_objVSSAllに含まれない場合、nullを返す、でよい？
 
   // _strPathが空文字列の場合、全ツリーを返す
   if (_strPath == '' || _strPath == undefined || _strPath == null)
-    return _objVssAll;
+    return _objVSSAll;
 
   // - _strPath を.で分割
   var nodeNames = _strPath.split(".");
 
-  // - _objVssAllをルートからたどっていく
+  // - _objVSSAllをルートからたどっていく
   var pathLen = nodeNames.length;
-  var allTree = _objVssAll;
+  var allTree = _objVSSAll;
   var allTreePtr = null;  // allTreeをたどるためのポインタ
   allTreePtr = allTree;
 
@@ -914,12 +923,13 @@ function extractPartialVss(_objVssAll, _strPath) {
     var node = nodeNames[i];
     if (allTreePtr[node] == undefined) {
       // _strPathのノードの一部がvssAll内に含まれない
-      // => _strPathにマッチするVssはなし。null を return
+      // => _strPathにマッチするVSSはなし。null を return
+      printLog(LOG_DEFAULT, "Node:"+node+" not exists. Return null and exit.");
       return null;
     }
 
     // ノードはvssAllに含まれていた
-    console.log("Node:["+node+"] exists");
+    printLog(LOG_DEFAULT, "Node:["+node+"] exists");
     var nextNode = allTreePtr[node];
     var nextNodeCopy = Object.assign({},nextNode); // Object.assign()はobjectのコピー
 
@@ -929,8 +939,8 @@ function extractPartialVss(_objVssAll, _strPath) {
     // ループの最終周なら、ここで結果を返して終了
     if (i == pathLen-1) {
       //カレントノードがchildrenなしなら、そのまま返す
-      console.log("<br>SUCCESS: reached to the end");
-      console.log("res = " + JSON.stringify(resultTree));
+      printLog(LOG_DEFAULT, "SUCCESS: reached to the end");
+      printLog(LOG_DEFAULT, "res = " + JSON.stringify(resultTree));
       return resultTree;
     }
 
@@ -938,13 +948,13 @@ function extractPartialVss(_objVssAll, _strPath) {
 
     // allTreePtrのポインタを移動する
     if (nextNode['children'] != undefined) {
-      console.log("children exists. Go next loop.");
+      printLog(LOG_DEFAULT, "children exists. Go next loop.");
       allTreePtr = nextNode['children'];
     } else {
       // childrenが無い場合は、現ノードに移動
       // ただし、この場合、これ以上の子ノードが無いので、
       // 次ループは意味が無いはずだが、そこは次ループで判定される
-      console.log("No children. Go next loop");
+      printLog(LOG_DEFAULT, "No children. Go next loop");
       allTreePtr = nextNode;
     }
 
@@ -1034,11 +1044,11 @@ function createSetErrorResponse(reqId, error, timestamp) {
 }
 
 // == getVSS ==
-function createVssSuccessResponse(reqId, vss) {
+function createVSSSuccessResponse(reqId, vss) {
   var retObj = {"action": "getVSS", "requestId":reqId, "vss":vss};
   return retObj;
 }
-function createVssErrorResponse(reqId, error, timestamp) {
+function createVSSErrorResponse(reqId, error, timestamp) {
   var retObj = {"action": "getVSS", "requestId":reqId, "error":error};
   return retObj;
 }

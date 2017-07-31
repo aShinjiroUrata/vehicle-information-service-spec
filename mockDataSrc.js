@@ -94,14 +94,25 @@ dataSrcSvr.on('request', function(request) {
         return;
       }
       if (reqObj.action === 'set') {
-        //console.log('  :reqObj = '+ JSON.stringify(reqObj));
-        var result = saveSetData(reqObj.path, reqObj.value);
-        var retObj = createSetResponse(result, reqObj.path, reqObj.value,
-                                        reqObj.dataSrcRequestId);
-        //console.log('  :retObj = '+ JSON.stringify(retObj));
+        // request format: {'action':'set': 'data':
+        //   {'requestId':'reqId str', 'path':'path str', 'value':'the value str'}}
+        console.log('  :reqObj = '+ JSON.stringify(reqObj));
+        var data = reqObj.data;
+        var path = data.path;
+        var val  = data.value;
+        var reqId = data.requestId;
+        var result = saveSetData(path, val);
+        var retObj = createSetResponse(result, path, val,reqId);
+        console.log('  :retObj = '+ JSON.stringify(retObj));
         conn.sendUTF(JSON.stringify(retObj));
       } else if (reqObj.action === 'getVSS') {
-        var retObj = createVssResponse(g_vss, reqObj.dataSrcRequestId);
+        //TODO170728: no error case is considered here.
+        // request format: {'action':'getVSS': 'data'{'requestId':'reqId'}}
+        console.log('  :reqObj = '+ JSON.stringify(reqObj));
+        var data = reqObj.data;
+        var reqId = data.requestId;
+        var retObj = createVSSResponse(g_vss, reqId);
+        console.log('  :retObj = '+ JSON.stringify(retObj));
         conn.sendUTF(JSON.stringify(retObj));
       }
     }
@@ -251,39 +262,60 @@ function saveSetData(_path, _value) {
   return ERR_OK;
 }
 
+/*
+ * [set response format]
+ * success case: {'action':'set', 'data':{'requestId':reqId, 'timestamp':timestamp}}
+ * error   case: {'action':'set', 'data':{'requestId':reqId, 'timestamp':timestamp, 'error': errObj}}
+ * errObj: {'number':errorNumber, 'message':'error description'}
+ */
 function createSetResponse(result, path, value, dataSrcReqId) {
   var dataObj;
   var timestamp = new Date().getTime().toString(10);
 
   if (result == ERR_OK) {
-    dataObj = {'action':'set', 'path':path, 'value':value,
-               'dataSrcRequestId':dataSrcReqId, 'timestamp':timestamp};
+    dataObj = {  //'path':path, 'value':value,
+                 'requestId':dataSrcReqId,
+                 'timestamp':timestamp};
   } else {
-    var err = getErrorObj(result);
-    dataObj = {'action':'set', 'path':path, 'error':err,
-               'dataSrcRequestId':dataSrcReqId, 'timestamp':timestamp};
+    var errObj = getErrorObj(result);
+    dataObj = {  //'path':path,
+                 'error':errObj,
+                 'requestId':dataSrcReqId,
+                 'timestamp':timestamp};
   }
-  var obj = {"set": dataObj};
+  var obj = {'action':'set', 'data':dataObj};
   return obj;
 }
 
-function createVssResponse(_origVssObj, dataSrcReqId) {
-  var dataObj = {'action':'getVSS', 'vss':_origVssObj,
-               'dataSrcRequestId':dataSrcReqId};
-  var obj = {"vss": dataObj};
+/*
+ * [getVSS response format]
+ * success case: {'action':'getVSS', 'data':{'vss': vssObj, 'requestId':reqId}}
+ * error   case: {'action':'getVSS', 'data':{'error': errObj, 'requestId':reqId}}
+ */
+function createVSSResponse(_origVSSObj, dataSrcReqId) {
+  var dataObj = {'vss':_origVSSObj,
+                 'requestId':dataSrcReqId};
+  var obj = {'action':'getVSS', 'data': dataObj};
   return obj;
 }
 
+/*
+ * errObj: {'number':errorNumber, 'message':'error description'}
+ */
 function getErrorObj(errValue) {
+  /* decided not to use VISS spec's error definition as it is,
+   * since it looks not matured.
+   * Define own errors here which is simple and minimum.
+   */
   var ret;
   if (errValue == ERR_BAD_REQUEST) {
-    ret = {'number':400, 'reason':errValue, 'message':'The server is unable to fulfil..'};
+    ret = {'number':400, 'message':'The server is unable to fulfil..'};
   } else if (errValue == ERR_INVALID_PATH) {
-    ret = {'number':404, 'reason':errValue, 'message':'The specified data path does not exist.'};
+    ret = {'number':404, 'message':'The specified data path does not exist.'};
   } else {
     //unknown
     //this is not in the spec.
-    ret = {'number':-1, 'reason':'unknown_error', 'message':'Error by unknown reason.'};
+    ret = {'number':-1,  'message':'Error by unknown reason.'};
   }
   return ret;
 }
