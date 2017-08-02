@@ -10,6 +10,7 @@
   body{
     width:1920px;
     margin:10px;
+    margin-left:100px;
   }
   #header{
     width:1920px;
@@ -46,7 +47,7 @@
 
 <body>
   <header id="header">
-    <h3> Vehicle information Service Spec Test Client </h3>
+    <h3> Vehicle Information Service Spec Test UI </h3>
     <span id="server_info"></span>
     <br>
   </header>
@@ -425,7 +426,7 @@
       // received VSS is shown in log msg textarea
       if (isVssSuccessResponse(msg)) {
         showGetResMsg("Successfully retrieved VSS json.", reqTableItem.dispId);
-        showInMsgArea("--:vss = " + JSON.stringify(msg.vss));
+        showInMsgArea("--:vss = " + JSON.stringify(msg.vss).substr(0,600));
       } else if (isVssErrorResponse(msg)) {
         console.log("getVss: error case");
         showGetResMsg("Failed.", reqTableItem.dispId);

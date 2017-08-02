@@ -888,7 +888,7 @@ function printLog(lvl, msg) {
 
 // == extract partial vss from full-vss-tree by specifying 'path'
 function extractPartialVSS(_objVSSAll, _strPath) {
-  printLog(LOG_DEFAULT, "extractParialVSS: vss="
+  printLog(LOG_DEFAULT, "  :extractParialVSS: vss="
             + JSON.stringify(_objVSSAll).substr(0,100) + " path="+_strPath);
   //pathの分類
   // a.fullpath
@@ -924,12 +924,12 @@ function extractPartialVSS(_objVSSAll, _strPath) {
     if (allTreePtr[node] == undefined) {
       // _strPathのノードの一部がvssAll内に含まれない
       // => _strPathにマッチするVSSはなし。null を return
-      printLog(LOG_DEFAULT, "Node:"+node+" not exists. Return null and exit.");
+      printLog(LOG_DEFAULT, "  :Node:"+node+" not exists. Return null and exit.");
       return null;
     }
 
     // ノードはvssAllに含まれていた
-    printLog(LOG_DEFAULT, "Node:["+node+"] exists");
+    printLog(LOG_DEFAULT, "  :Node:["+node+"] exists");
     var nextNode = allTreePtr[node];
     var nextNodeCopy = Object.assign({},nextNode); // Object.assign()はobjectのコピー
 
@@ -939,8 +939,8 @@ function extractPartialVSS(_objVSSAll, _strPath) {
     // ループの最終周なら、ここで結果を返して終了
     if (i == pathLen-1) {
       //カレントノードがchildrenなしなら、そのまま返す
-      printLog(LOG_DEFAULT, "SUCCESS: reached to the end");
-      printLog(LOG_DEFAULT, "res = " + JSON.stringify(resultTree));
+      printLog(LOG_DEFAULT, "  :SUCCESS: reached to the end");
+      printLog(LOG_DEFAULT, "  :res = " + JSON.stringify(resultTree));
       return resultTree;
     }
 
@@ -948,13 +948,13 @@ function extractPartialVSS(_objVSSAll, _strPath) {
 
     // allTreePtrのポインタを移動する
     if (nextNode['children'] != undefined) {
-      printLog(LOG_DEFAULT, "children exists. Go next loop.");
+      printLog(LOG_DEFAULT, "  :children exists. Go next loop.");
       allTreePtr = nextNode['children'];
     } else {
       // childrenが無い場合は、現ノードに移動
       // ただし、この場合、これ以上の子ノードが無いので、
       // 次ループは意味が無いはずだが、そこは次ループで判定される
-      printLog(LOG_DEFAULT, "No children. Go next loop");
+      printLog(LOG_DEFAULT, "  :No children. Go next loop");
       allTreePtr = nextNode;
     }
 

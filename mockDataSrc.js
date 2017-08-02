@@ -112,7 +112,7 @@ dataSrcSvr.on('request', function(request) {
         var data = reqObj.data;
         var reqId = data.requestId;
         var retObj = createVSSResponse(g_vss, reqId);
-        console.log('  :retObj = '+ JSON.stringify(retObj));
+        console.log('  :retObj = '+ JSON.stringify(retObj).substr(0,300));
         conn.sendUTF(JSON.stringify(retObj));
       }
     }
