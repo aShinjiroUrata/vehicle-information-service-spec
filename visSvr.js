@@ -163,10 +163,10 @@ var g_extMockDataSrc = (function() {
       printLog(LOG_DEFAULT,'  :Connected to DataSrc');
 
       conn.on('error', function(err) {
-        printLog(LOG_QUIET,"  :dataSrc on error ");
+        //printLog(LOG_QUIET,"  :dataSrc on error ");
       });
       conn.on('close', function() {
-        printLog(LOG_QUIET,"  :dataSrc on close ");
+        //printLog(LOG_QUIET,"  :dataSrc on close ");
         m_conn = null;
       });
       conn.on('message', function(msg) {
