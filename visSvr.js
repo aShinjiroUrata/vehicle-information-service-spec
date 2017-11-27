@@ -1023,13 +1023,11 @@ function createUnsubscribeErrorResponse(action, reqId, subId, error, timestamp) 
 
 function createUnsubscribeAllSuccessResponse(action, reqId, timestamp) {
   var retObj = {"action": action, "requestId":reqId, 
-                "subscriptionId": null, // is this necessary?
                 "timestamp":timestamp};
   return retObj;
 }
 function createUnsubscribeAllErrorResponse(action, reqId, error, timestamp) {
   var retObj = {"action": action, "requestId":reqId,
-                "subscriptionId": null,
                 "error":error, "timestamp":timestamp};
   return retObj;
 }
