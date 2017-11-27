@@ -770,8 +770,8 @@ function dataReceiveHandler(message) {
 
           } else if (reqObj.action === "subscribe") {
             // send back 'subscribeSuccessResponse'
-            retObj = createSubscribeNotificationJson(reqObj.requestId, reqObj.subscriptionId,
-                        reqObj.action, reqObj.path, matchObj.value, matchObj.timestamp);
+            retObj = createSubscriptionNotificationJson(reqObj.subscriptionId, matchObj.value, matchObj.timestamp);
+
             if (_ws != null)
               _ws.send(JSON.stringify(retObj));
           } else {
@@ -1005,8 +1005,12 @@ function createSubscribeErrorResponse(action, reqId, path, error, timestamp) {
   return retObj;
 }
 
-function createSubscribeNotificationJson(reqId, subId, action, path, val, timestamp) {
-  var retObj = {'subscriptionId':subId, 'path':path, 'value':val, 'timestamp':timestamp};
+function createSubscriptionNotificationJson(subId, val, timestamp) {
+  var retObj = {'action':'subscription', 'subscriptionId':subId, 'value':val, 'timestamp':timestamp};
+  return retObj;
+}
+function createSubscriptionNotificationErrorJson( subId, error, timestamp) {
+  var retObj = {'action':'subscription', 'subscriptionId':subId, 'error':error, 'timestamp':timestamp};
   return retObj;
 }
 
