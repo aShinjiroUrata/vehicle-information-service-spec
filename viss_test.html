@@ -32,7 +32,7 @@
   <style>
     #msg { height:600px; width:1200px; background-color:lightgrey; font-size:14px;}
     #msg_vss { height:100px; width:500px; background-color:lightgrey; font-size:14px;}
-    #msg_getvss { height:20px; width:500px; background-color:lightgrey; font-size:14px;}
+    #msg_getmetadata { height:20px; width:500px; background-color:lightgrey; font-size:14px;}
     #msg_authorize { height:20px; width:500px; background-color:lightgrey; font-size:14px;}
     .msg_vss_desc { height: 20px; width:500px; background-color:lightgrey; font-size:14px; display:inline-block;}
     .val_area { height: 20px; width:150px; background-color:lightgrey; font-size:14px; display:inline-block;}
@@ -62,9 +62,9 @@
       <button onclick="btnAuthorizeValidToken();"  >authorize with valid token</button>
       <button onclick="btnAuthorizeInvalidToken();">authorize with invalid token</button>
       <span class="val_area" id="msg_authorize"></span>
-      <br><button onclick="btnGetVss();">get VSS</button>
-      <span>path: </span><input type="text" class="val_area_middle" id="txt_getVss_path"></input>
-      <span class="val_area" id="msg_getvss"></span>
+      <br><button onclick="btnGetMetadata();">getMetadata</button>
+      <span>path: </span><input type="text" class="val_area_middle" id="txt_getMetadata_path"></input>
+      <span class="val_area" id="msg_getmetadata"></span>
       <br>
 
       <br><button onclick="btnGetSpeed();">get speed</button>
@@ -325,7 +325,7 @@
     if (action === "get") {
       if (isGetSuccessResponse(msg)) {
         if (reqTableItem.dispId === 'msg_vss')
-          showGetVssResMsg(msg.value, reqObj.action, reqObj.path);
+          showGetMetadataResMsg(msg.value, reqObj.action, reqObj.path);
         else
           showGetResMsg(msg.value, reqTableItem.dispId)
 
@@ -358,7 +358,7 @@
       } else if (isSubscriptionNotification(msg)) {
         // case of subscribeNotification
         if (reqTableItem.dispId === 'msg_vss')
-          showGetVssResMsg(msg.value, reqObj.action, reqObj.path);
+          showGetMetadataResMsg(msg.value, reqObj.action, reqObj.path);
         else
           showGetResMsg(msg.value, reqTableItem.dispId)
 
@@ -420,18 +420,18 @@
         showGetResMsg("Rejected! err="+msg.error, reqTableItem.dispId);
       }
       g_reqTable.deleteRequest(reqId);
-    // case of 'getVSS'
-    } else if (action === "getVSS") {
-      console.log("getVSS:");
+    // case of 'getMetadata'
+    } else if (action === "getMetadata") {
+      console.log("getMetadata:");
       // received VSS is shown in log msg textarea
       if (isVssSuccessResponse(msg)) {
         showGetResMsg("Successfully retrieved VSS json.", reqTableItem.dispId);
         showInMsgArea("--:vss = " + JSON.stringify(msg.vss).substr(0,600));
       } else if (isVssErrorResponse(msg)) {
-        console.log("getVss: error case");
+        console.log("getMetadata: error case");
         showGetResMsg("Failed.", reqTableItem.dispId);
       } else {
-        console.log("getVss: else case");
+        console.log("getMetadata: else case");
       }
       g_reqTable.deleteRequest(reqId);
     } else {
@@ -493,26 +493,26 @@
     wsAuthorize(TOKEN_INVALID, TOKEN_INVALID);
   }
 
-  // === getVSS ===
-  function wsGetVss(_path) {
+  // === getMetadata ===
+  function wsGetMetadata(_path) {
     //TODO: get VSS under path: not suppoted yet
-    showInMsgArea("wsGetVss:");
+    showInMsgArea("wsGetMetadata:");
     if (g_vehicle != null && g_vehicle.readyState === WS_OPEN) {
       var reqId = getUniqueReqId();
-      var req = {"action": "getVSS", "path": _path, "requestId":reqId};
-      var item = {"reqObj": req, "dispId": 'msg_getvss'};
+      var req = {"action": "getMetadata", "path": _path, "requestId":reqId};
+      var item = {"reqObj": req, "dispId": 'msg_getmetadata'};
       g_reqTable.addRequest(reqId, item);
       var json_str = JSON.stringify(req);
       g_vehicle.send(json_str);
       showInMsgArea("--: ==> " + json_str);
     }
   }
-  function btnGetVss() {
-    var path = getVssPath();
-    wsGetVss(path);
+  function btnGetMetadata() {
+    var path = getMetadataPath();
+    wsGetMetadata(path);
   }
-  function getVssPath() {
-    var val = document.getElementById("txt_getVss_path").value;
+  function getMetadataPath() {
+    var val = document.getElementById("txt_getMetadata_path").value;
     return val;
   }
 
@@ -839,17 +839,17 @@
     else
       return false;
   }
-  // == getVSS helper funcs ==
+  // == getMetadata helper funcs ==
   // Judge returned Json message's type
   function isVssSuccessResponse(msg) {
-    if (msg.action === "getVSS" && msg.requestId != undefined && msg.vss != undefined &&
+    if (msg.action === "getMetadata" && msg.requestId != undefined && msg.vss != undefined &&
         msg.error == undefined)
       return true;
     else
       return false;
   }
   function isVssErrorResponse(msg) {
-    if (msg.action === "getVSS" && msg.requestId != undefined && msg.vss == undefined &&
+    if (msg.action === "getMetadata" && msg.requestId != undefined && msg.vss == undefined &&
         msg.error != undefined)
       return true;
     else
@@ -882,7 +882,7 @@
     var targ = document.getElementById(targ_id);
     targ.innerHTML = value;
   }
-  function showGetVssResMsg(value, action, path) {
+  function showGetMetadataResMsg(value, action, path) {
     var msgText = action + " : " + path + "\n==> value : "+value;
     showInMsgAreaById(msgText, 'msg_vss', 200);
   }

@@ -213,7 +213,7 @@ var g_extMockDataSrc = (function() {
     },
     createExtMockSvrVSSRequestJson: function(_obj, _dataSrcReqId) {
       // No need to specify path since, narrow down is done in visSvr side.
-      var retObj = {"action": "getVSS", "data": {
+      var retObj = {"action": "getMetadata", "data": {
                     "requestId":_dataSrcReqId}};
       return retObj;
     },
@@ -566,7 +566,7 @@ wssvr.on('connection', function(ws) {
       }
       ws.send(JSON.stringify(resObj));
 
-    } else if (obj.action === "getVSS") {
+    } else if (obj.action === "getMetadata") {
       // - VSS json is retrieved from dataSrc
       // TODO:
       // - how to extract sub-tree by 'path'? extract in VISS or dataSrc side?
@@ -574,7 +574,7 @@ wssvr.on('connection', function(ws) {
       var path = obj.path;
       var ret = _reqTable.addReqToTable(obj, null, null);
       g_extMockDataSrc.sendVSSRequest(obj, reqId, _sessId);
-      printLog(LOG_VERBOSE,"  :getVSS request registered. reqId=" + reqId + ", path=" + path);
+      printLog(LOG_VERBOSE,"  :getMetadata request registered. reqId=" + reqId + ", path=" + path);
 
     // for 'subscribe'
     } else if (obj.action === "subscribe") {
@@ -666,7 +666,7 @@ function dataReceiveHandler(message) {
     dataObj = obj.data;
   } else if (obj.action === "set") {
     setObj = obj.data; //TODO: sync with acs vehicle data I/F document
-  } else if (obj.action === "getVSS") {
+  } else if (obj.action === "getMetadata") {
     vssObj = obj.data;
   } else {
     // irregular data. exit
@@ -677,9 +677,9 @@ function dataReceiveHandler(message) {
   var matchObj;
   var retObj, reqObj;
 
-  // if 'getVSS' or 'set' response exists..
+  // if 'getMetadata' or 'set' response exists..
   if (vssObj || setObj) {
-    //printLog(LOG_DEFAULT,"  :getVSS message=" + JSON.stringify(vssObj).substr(0,200));
+    //printLog(LOG_DEFAULT,"  :getMetadata message=" + JSON.stringify(vssObj).substr(0,200));
 
     //[TODO] vssObj setObj 両方あるケースはなかったか？
     var _dataSrcReqId = null;
@@ -706,7 +706,7 @@ function dataReceiveHandler(message) {
       var _ws = _sessObj.ws;
       var _reqObj = _reqTable.requestHash[_reqId];
 
-      // for getVSS response
+      // for getMetadata response
       if (vssObj) {
         if (vssObj.error != undefined) {
           //TODO: test this case
@@ -716,7 +716,7 @@ function dataReceiveHandler(message) {
           var targetVSS = extractPartialVSS(vssObj.vss, _reqObj.path);
           retObj = createVSSSuccessResponse(_reqObj.requestId, targetVSS);
         }
-        printLog(LOG_VERBOSE,"  :getVSS response="+JSON.stringify(retObj).substr(0,3000));
+        printLog(LOG_VERBOSE,"  :getMetadata response="+JSON.stringify(retObj).substr(0,3000));
 
       // for set response
       } else {
@@ -893,7 +893,7 @@ function extractPartialVSS(_objVSSAll, _strPath) {
   //pathの分類
   // a.fullpath
   // b.途中まで
-  // #getVSSは wildcard 非サポート
+  // #getMetadataは wildcard 非サポート
 
   // 手順
   // - _strPath を.で分割
@@ -1045,13 +1045,13 @@ function createSetErrorResponse(reqId, error, timestamp) {
   return retObj;
 }
 
-// == getVSS ==
+// == getMetadata ==
 function createVSSSuccessResponse(reqId, vss) {
-  var retObj = {"action": "getVSS", "requestId":reqId, "vss":vss};
+  var retObj = {"action": "getMetadata", "requestId":reqId, "vss":vss};
   return retObj;
 }
 function createVSSErrorResponse(reqId, error, timestamp) {
-  var retObj = {"action": "getVSS", "requestId":reqId, "error":error};
+  var retObj = {"action": "getMetadata", "requestId":reqId, "error":error};
   return retObj;
 }
 // == authorize ==

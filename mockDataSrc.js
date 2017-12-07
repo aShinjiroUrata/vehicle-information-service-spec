@@ -105,9 +105,9 @@ dataSrcSvr.on('request', function(request) {
         var retObj = createSetResponse(result, path, val,reqId);
         console.log('  :retObj = '+ JSON.stringify(retObj));
         conn.sendUTF(JSON.stringify(retObj));
-      } else if (reqObj.action === 'getVSS') {
+      } else if (reqObj.action === 'getMetadata') {
         //TODO170728: no error case is considered here.
-        // request format: {'action':'getVSS': 'data'{'requestId':'reqId'}}
+        // request format: {'action':'getMetadata': 'data'{'requestId':'reqId'}}
         console.log('  :reqObj = '+ JSON.stringify(reqObj));
         var data = reqObj.data;
         var reqId = data.requestId;
@@ -288,14 +288,14 @@ function createSetResponse(result, path, value, dataSrcReqId) {
 }
 
 /*
- * [getVSS response format]
- * success case: {'action':'getVSS', 'data':{'vss': vssObj, 'requestId':reqId}}
- * error   case: {'action':'getVSS', 'data':{'error': errObj, 'requestId':reqId}}
+ * [getMetadata response format]
+ * success case: {'action':'getMetadata', 'data':{'vss': vssObj, 'requestId':reqId}}
+ * error   case: {'action':'getMetadata', 'data':{'error': errObj, 'requestId':reqId}}
  */
 function createVSSResponse(_origVSSObj, dataSrcReqId) {
   var dataObj = {'vss':_origVSSObj,
                  'requestId':dataSrcReqId};
-  var obj = {'action':'getVSS', 'data': dataObj};
+  var obj = {'action':'getMetadata', 'data': dataObj};
   return obj;
 }
 
