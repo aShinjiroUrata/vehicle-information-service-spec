@@ -1,7 +1,10 @@
 // Copyright (c) 2017 ACCESS CO., LTD. All rights reserved.
 //
 // == Config VIS Server IP and Port Number here ==
-var VISS_IP = '127.0.0.1';
+// For NAT using servers, separate IP to public and private
+var VISS_IP_PUB = '127.0.0.1';  // used from test-ui.html
+var VISS_IP_PRV = '127.0.0.1';  // used in visSvr.js to start WebSocket server
+var VISS_IP = VISS_IP_PUB;
 
 var VISS_PORT = '3000';
 var VISS_SUBPROTO = 'wvss1.0';
