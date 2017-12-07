@@ -12,7 +12,7 @@
 
 // == Server IP and Port Number ==
 var svr_config = require('./svr_config');
-var VISS_IP = svr_config.VISS_IP;
+var VISS_IP = svr_config.VISS_IP_PRV;
 var VISS_PORT = svr_config.VISS_PORT;
 var SUBPROTOCOL = "wvss1.0";
 
