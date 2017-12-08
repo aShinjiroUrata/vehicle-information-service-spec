@@ -22,6 +22,10 @@ var TOKEN_INVALID = svr_config.TOKEN_INVALID;
 var EXT_MOCKSVR_IP = svr_config.DATASRC_IP;
 var EXT_MOCKSVR_PORT = svr_config.DATASRC_PORT;
 
+var EXT_SIPSVR_IP     = svr_config.HKSV_SRC_IP;
+var EXT_SIPSVR_PORT   = svr_config.HKSV_SRC_PORT;
+var EXT_SIPSVR_ROOMID = svr_config.HKSV_ROOMID;
+
 // == data source selection ==
 var LOCAL_MOCK_DATA = 0;
 var EXT_MOCK_SERVER = 1;
@@ -247,9 +251,8 @@ if (dataSrc === EXT_MOCK_SERVER) {
 // ======================================================
 // #use socket.io by requirement of Hackathon server
 var g_extSIPDataSrc = {
-  roomID: 'room01',
-  //svrUrl: "ws://xx.xx.xx.xx:xxxx",
-  svrUrl: "ws://52.193.60.25:3000",
+  roomID: EXT_SIPSVR_ROOMID,  // def in 'svr_config.js'
+  svrUrl: "ws://" + EXT_SIPSVR_IP + ":" + EXT_SIPSVR_PORT,  //def in 'svr_config.js'
 
   // Convert data from SIP's format(hackathon format) to VSS format
   // TODO: re-write in better way
