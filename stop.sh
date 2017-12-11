@@ -3,8 +3,9 @@
 pgrep -f 'visSvr' | xargs kill
 echo "visSvr killed"
 #sleep 1s
-pgrep -f 'mockData' | xargs kill
-echo "mockData killed"
+#pgrep -f 'mockData' | xargs kill
+pgrep -f 'manuData' | xargs kill
+echo "manuData killed"
 #sleep 1s
 
 #pgrep -f 'httpsvr_start' | xargs kill

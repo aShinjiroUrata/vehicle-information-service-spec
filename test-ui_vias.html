@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<!-- test-ui.html  -->
+<!-- Copyright (c) 2017 ACCESS CO., LTD. All rights reserved. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>VISS test UI</title>
+
+  <style>
+  body{
+    width:1920px;
+    margin:10px;
+  }
+  #header{
+    width:1920px;
+    margin:5px;
+  }
+  #wrapper{
+    float:left;
+  }
+  #main{
+    width:550px;
+    float:left;
+  }
+  #right{
+    width:1200px;
+    float:right;
+  }
+  </style>
+
+  <style>
+    #msg { height:600px; width:1200px; background-color:lightgrey; font-size:14px;}
+    #msg_vss { height:100px; width:500px; background-color:lightgrey; font-size:14px;}
+    #msg_getvss { height:20px; width:500px; background-color:lightgrey; font-size:14px;}
+    #msg_authorize { height:20px; width:500px; background-color:lightgrey; font-size:14px;}
+    .msg_vss_desc { height: 20px; width:500px; background-color:lightgrey; font-size:14px; display:inline-block;}
+    .val_area { height: 20px; width:150px; background-color:lightgrey; font-size:14px; display:inline-block;}
+    .val_area_middle { height: 20px; width:350px; background-color:lightgrey; font-size:14px; display:inline-block;}
+    .val_area_long { height: 20px; width:500px; background-color:lightgrey; font-size:14px; display:inline-block;}
+    #server_info {height:20px; width:500px; font-size:13px;}
+    #span_path {height:20px; width:20px; font-size:13px;}
+    .span_text {height:20px; width:20px; font-size:13px;}
+  </style>
+  <script src="./svr_config.js"></script>
+</head>
+
+<body>
+  <header id="header">
+    <h3> Vehicle information Service Spec Test Client </h3>
+    <span id="server_info"></span>
+    <br>
+  </header>
+
+  <div id="wrapper">
+    <main id="main">
+      <button id='idBtnConnect'>ws connect</button>
+      <button onclick="btnDisconnect();">ws disconnect</button>
+      <span class="val_area" id="msg_connect"></span>
+
+      <br>
+      <button onclick="btnAuthorizeValidToken();"  >authorize with valid token</button>
+      <button onclick="btnAuthorizeInvalidToken();">authorize with invalid token</button>
+      <span class="val_area" id="msg_authorize"></span>
+      <br><button onclick="btnGetVss();">get VSS</button>
+      <span>path: </span><input type="text" class="val_area_middle" id="txt_getVss_path"></input>
+      <span class="val_area" id="msg_getvss"></span>
+      <br>
+
+      <br><button id='idBtnGetSpeed'>get speed</button>
+      <span class="val_area" id="msg_get_speed" ></span>
+      <br><button onclick="btnGetEngineRPM();">get engine RPM</button>
+      <span class="val_area" id="msg_get_rpm"></span>
+      <br><button onclick="btnGetSteeringAngle();">get steering angle</button>
+      <span class="val_area" id="msg_get_steer"></span>
+      <br>
+
+      <br><button onclick="btnSetDoorRow1RightLock();">set DoorLock(Row1-Right)</button>
+      <input type="text" class="val_area" id="txt_set_doorRow1RightLock" ></input>
+      <span class="span_text">(*authorize required)</span>
+      <br><button onclick="btnGetDoorRow1RightLock();">get DoorLock(Row1-Right)</button>
+      <span class="val_area" id="msg_get_doorRow1RightLock" ></span>
+
+      <br><button onclick="btnSetHVACRow1RightTemp();">set HVACTemp(Row1-Right)</button>
+      <input type="text" class="val_area" id="txt_set_hvacRow1RightTemp"></input>
+      <span class="span_text">(*authorize required)</span>
+      <br><button onclick="btnGetHVACRow1RightTemp();">get HVACTemp(Row1-Right)</button>
+      <span class="val_area" id="msg_get_hvacRow1RightTemp"></span>
+      <br>
+
+      <br><button onclick="btnSubscribeSpeed();">subscribe speed</button>
+      <button onclick="btnUnsubscribeSpeed();">unsubscribe</button>
+      <span class="val_area" id="msg_sub_speed"></span>
+      <br><button onclick="btnSubscribeEngineRpm();">subscribe engine RPM</button>
+      <button onclick="btnUnsubscribeEngineRpm();">unsubscribe</button>
+      <span class="val_area" id="msg_sub_rpm"></span>
+      <br><button onclick="btnSubscribeSteerAngle();">subscribe steer angle</button>
+      <button onclick="btnUnsubscribeSteerAngle();">unsubscribe</button>
+      <span class="val_area" id="msg_sub_steer"></span>
+      <br><button onclick="btnUnsubscribeAll();">unsubscribeAll</button>
+      <br>
+
+      <!-- use VSS data -->
+      <br><span id="span_path">data path: </span><select id="sel_path">
+        <option value="">----</option>
+      </select>
+      <br><input type="text" class="val_area_long" id="txt_vss_path"></input>
+      <br><span class="msg_vss_desc" id="msg_vss_desc1"></span>
+      <br><span class="msg_vss_desc" id="msg_vss_desc2"></span>
+      <br>
+      <button onclick="btnGetAnyItem();">get</button>
+      <button onclick="btnSubscribeAnyItem();">subscribe</button>
+      <button onclick="btnUnsubscribeAnyItem();">unsubscribe</button><br>
+      <button onclick="btnSetAnyItem();">set</button>
+      <input type="text" class="val_area" id="txt_vss_set" ></input>
+      <br>
+      <button onclick="clearVssMsgArea();">clearMsgArea</button>
+      <textarea id="msg_vss"></textarea>
+
+    </main>
+    <div id="right">
+      <button onclick="clearMsgArea();">clearMsgArea</button>
+      <textarea id="msg"></textarea>
+    </div>
+  </div>
+
+  <script src="./vias.js"></script>
+  <script>
+  // ==========================
+  // == 以下VIAS対応の新実装 ==
+  // == - まずはUI連携なしで
+  // == - まずはobject カプセル化などなしで
+  // == - VIAS の基本機能一部のみ動作する状態を目指す
+  // == - もっと簡単なサンプルPGレベルから始めた方がよいかも？
+
+
+  // ===========
+  // == const ==
+  const viscOption = {
+    'host': VISS_IP,
+    'protocol': 'ws://',
+    'port': VISS_PORT
+  };
+  var VSS_SPEED = 'Signal.Drivetrain.Transmission.Speed';
+
+  // =============
+  // == global ==
+  var g_vias = null;  // VIAS instance
+  var g_ui = null;    // UI controller
+  var g_vssObj = null;
+
+  g_vssObj = {
+    vss : {},
+    createPathArry : function () {
+
+    }
+  }
+
+  g_ui = {
+
+    // == button handlers
+    handleBtnConnect : function () {
+      // g_vias で connectを実行
+      g_vias.connect(connectCb, connectErrCb);
+    },
+    handleBtnGetSpeed : function () {
+      // g_vias で get speed を実行
+      //g_vias.get( VSS_SPEED, getCb, getErrCb);
+      g_vias.get( VSS_SPEED,
+        (_val)=>{
+          var targ = document.getElementById('msg_get_speed');
+          targ.innerText = _val;
+        },
+        (_err)=>{
+          var targ = document.getElementById('msg_get_speed');
+          targ.innerText = _err.number + ': '+_err.reason;
+        }
+      );
+    }
+
+    // == display handlers
+
+  }
+
+  // ==============
+  // == callback ==
+  const connectCb = () => {
+    console.log("websocket connected");
+    // TODO: what to do?
+  }
+  const connectErrCb = (_err) => {
+    console.log("websocket connect failed");
+    // TODO: Failure
+  }
+  const getCb = (_val) => {
+    console.log("get success: val=" + _val);
+  }
+  const getErrCb = (_err) => {
+    console.log("get failure: err=" + _err);
+  }
+
+  // =============
+  // == ui init ==
+  (function init() {
+
+    // create VIAS instance
+    g_vias = new VISClient( viscOption );
+    if (g_vias == null) {
+      //TODO error
+    }
+
+    // == WebSocket 接続確立
+    //g_vias.connect(connectCb, connectErrCb);
+
+    // == 画面UIの初期化
+
+    // ==== button init
+    var btnConnect = document.getElementById('idBtnConnect');
+    btnConnect.addEventListener('click', g_ui.handleBtnConnect );
+    var btnGetSpeed = document.getElementById('idBtnGetSpeed');
+    btnGetSpeed.addEventListener('click', g_ui.handleBtnGetSpeed );
+
+
+    // ==== gamen hyouji init
+    var svr_area = document.getElementById("server_info");
+    svr_area.innerHTML = "Server IP:" + VISS_IP + "  WebSocket Port:" + VISS_PORT;
+
+    var msg_areas = document.getElementsByClassName("val_area");
+    for (var i=0; i<msg_areas.length; i++) {
+      msg_areas.item(i).innerHTML = "---";
+    }
+
+    // == vss UI initialize
+
+  })();
+
+  </script>
+</body>
+</html>
+

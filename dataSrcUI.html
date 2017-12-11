@@ -1,0 +1,104 @@
+<html>
+<body>
+
+<div>
+  vehicleSpeed
+  <input type='text' id='txtVehicleSpeed'></input>
+  <button id='btnVehicleSpeed'> Send </button>
+</div>
+<div>
+  driver temp
+  <input type='text' id='txtDriverTemp'></input>
+  <button id='btnDriverTemp'> Send </button>
+</div>
+<div>
+  PassengerTemp
+  <input type='text' id='txtPassengerTemp'></input>
+  <button id='btnPassengerTemp'> Send </button>
+</div>
+
+</body>
+<script src='./svr_config.js'></script>
+<script>
+// == const ==
+const PATH_DRIVER_TEMP       = 'Signal.Cabin.HVAC.Row1.Left.Temperature';
+const PATH_PASSENGER_TEMP    = 'Signal.Cabin.HVAC.Row1.Right.Temperature';
+const PATH_VEHICLE_SPEED     = 'Signal.Drivetrain.Transmission.Speed';
+
+const dataPathHash = {};
+dataPathHash['DriverTemp']      = 'Signal.Cabin.HVAC.Row1.Left.Temperature';
+dataPathHash['PassengerTemp']   = 'Signal.Cabin.HVAC.Row1.Right.Temperature';
+dataPathHash['VehicleSpeed']    = 'Signal.Drivetrain.Transmission.Speed';
+
+var ws = null;
+
+// == handler ==
+function handleVehicleSpeed() {
+  //get data from text box
+  var val = document.getElementById('txtVehicleSpeed').value;
+
+  //send data to manuDataSrc WSSvr
+  console.log('VehicleSpeed = ' + val);
+  var oMsg = {}
+  oMsg.action = 'push';
+  oMsg.path = PATH_VEHICLE_SPEED;
+  oMsg.value = val;
+  var sMsg = JSON.stringify(oMsg);
+  ws.send(sMsg);
+}
+
+function handleDriverTemp() {
+  //get data from text box
+  var val = document.getElementById('txtDriverTemp').value;
+
+  //send data to manuDataSrc WSSvr
+  console.log('DriverTemp = ' + val);
+  var oMsg = {}
+  oMsg.action = 'push';
+  oMsg.path = PATH_DRIVER_TEMP;
+  oMsg.value = val;
+  var sMsg = JSON.stringify(oMsg);
+  ws.send(sMsg);
+}
+
+function handleBtnAny(_dataName) {
+  //get data from text box
+  var val = document.getElementById('txt' + _dataName).value;
+
+  //send data to manuDataSrc WSSvr
+  console.log(_dataName + ' = ' + val);
+  var oMsg = {}
+  oMsg.action = 'push';
+  oMsg.path = dataPathHash[_dataName];
+  oMsg.value = val;
+  var sMsg = JSON.stringify(oMsg);
+  ws.send(sMsg);
+}
+
+// == util ==
+
+
+// == init ==
+(function init() {
+
+  //Eventhandler のセット
+  document.getElementById('btnVehicleSpeed').addEventListener('click', function(){handleVehicleSpeed();});
+  document.getElementById('btnDriverTemp').addEventListener('click', function(){handleDriverTemp();});
+  document.getElementById('btnPassengerTemp').addEventListener('click', function(){handleBtnAny('PassengerTemp');});
+
+  //manuDataSrc server への接続
+  ws = new WebSocket('ws://127.0.0.1:' + DATASRC_PORT);
+
+  ws.onopen = function() {
+    console.log("WebSocket connection open !!");
+  };
+
+  ws.onmessage = function(event) {
+    console.log("onmessage : " + event.data);
+  };
+
+
+})();
+
+</script>
+</html>
