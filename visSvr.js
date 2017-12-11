@@ -170,6 +170,7 @@ var g_extMockDataSrc = (function() {
         m_conn = null;
       });
       conn.on('message', function(msg) {
+        console.log("extMockDataSrc: onmessage: " + msg);
         if (msg.type === 'utf8') {
           dataReceiveHandler(msg.utf8Data);
         }
@@ -504,6 +505,7 @@ wssvr.on('connection', function(ws) {
 
   // for connecting to outside data source
   ws.on('message', function(message) {
+    printLog(LOG_DEFAULT,"  :ws.on:message: msg= " + message);
     var obj;
     try {
       obj = JSON.parse(message);
@@ -512,7 +514,7 @@ wssvr.on('connection', function(ws) {
       printLog(LOG_QUIET,"  :Error = "+e);
       return;
     }
-    printLog(LOG_DEFAULT,"  :ws.on:message: obj= " + message);
+    //printLog(LOG_DEFAULT,"  :ws.on:message: obj= " + message);
 
     // NOTE: assuming 1 message contains only 1 method.
     // for 'get'
@@ -657,17 +659,22 @@ function dataReceiveHandler(message) {
     printLog(LOG_QUIET,"  :Error = "+e);
     return;
   }
-  //console.log("from dataSrc= " + message.substr(0,300));
+  console.log("dataReceiveHandler= " + message.substr(0,300));
 
   var dataObj = null;
   var setObj  = null;
   var vssObj  = null;
+  var simpleObj = null;
   if (obj.action === "data") {
     dataObj = obj.data;
   } else if (obj.action === "set") {
     setObj = obj.data; //TODO: sync with acs vehicle data I/F document
   } else if (obj.action === "getVSS") {
     vssObj = obj.data;
+
+  // for IVIS test
+  } else if (obj.action === "simpledata") {
+    simpleObj = obj.data;
   } else {
     // irregular data. exit
     return;
@@ -780,6 +787,42 @@ function dataReceiveHandler(message) {
         }
       }
     }
+  } else if (simpleObj != undefined) {
+    printLog(LOG_DEFAULT, "simpledata : " + JSON.stringify(simpleObj));
+    for (var j in g_sessionHash) {
+      var _sessObj = g_sessionHash[j];
+      var _reqTable = _sessObj.reqTable;
+      var _ws = _sessObj.ws;
+      for (var i in _reqTable.requestHash) {
+        reqObj = _reqTable.requestHash[i];
+        if (reqObj.action != 'get' && reqObj.action != 'subscribe') {
+          printLog(LOG_VERBOSE,"  :skip data: action="+ reqObj.action);
+          continue;
+        }
+        matchObj = null;
+        retObj = null;
+
+        if ((matchObj = matchPathJsonSimple(reqObj, simpleObj)) != null) {
+          if (reqObj.action === "get") {
+            // send back 'getSuccessResponse'
+            retObj = createGetSuccessResponse(reqObj.requestId, matchObj.value, matchObj.timestamp);
+            if (_ws != null)
+              _ws.send(JSON.stringify(retObj));
+            // delete this request from queue
+            _reqTable.delReqByReqId(reqObj.requestId);
+
+          } else if (reqObj.action === "subscribe") {
+            // send back 'subscribeSuccessResponse'
+            retObj = createSubscribeNotificationJson(reqObj.requestId, reqObj.subscriptionId,
+                        reqObj.action, reqObj.path, matchObj.value, matchObj.timestamp);
+            if (_ws != null)
+              _ws.send(JSON.stringify(retObj));
+          } else {
+            // nothing to do
+          }
+        }
+      }
+    }
   }
 }
 
@@ -792,18 +835,30 @@ function matchPathJson(_reqObj, _dataObj) {
     //console.log("matching: key= " + arrPath[i]);
     if (targObj[arrPath[i]] == undefined) {
       //The specified path is not containted in dataObj
-      printLog(LOG_DEFAULT,"  :matchPathJson fail");
+      //printLog(LOG_DEFAULT,"  :matchPathJson fail");
       return null;
     } else {
       //printLog(LOG_DEFAULT,"  :matching: value= " + JSON.stringify(targObj[arrPath[i]]).substr(0,300) );
       targObj = targObj[arrPath[i]];
       if (i === arrPath.length-1) {
-        //printLog(LOG_DEFAULT,"  :matchPath:success: data= " + JSON.stringify(targObj));
+        printLog(LOG_DEFAULT,"  :matchPath:success: data= " + JSON.stringify(targObj));
         return targObj;
       }
     }
   }
 }
+
+function matchPathJsonSimple(_reqObj, _simpleObj) {
+  var reqPath = _reqObj.path;
+  var arrPath = reqPath.split(".");
+  var targObj = _simpleObj;
+
+  if (reqPath === targObj.path) {
+    console.log("matchPathJsonSimple: matched* " + targObj);
+    return targObj;
+  }
+}
+
 
 function accessControlCheck(_path, _action, _authHash) {
   printLog(LOG_VERBOSE,"  :accessControlCheck");
