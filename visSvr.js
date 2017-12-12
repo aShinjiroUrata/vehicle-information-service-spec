@@ -32,8 +32,8 @@ var EXT_MOCK_SERVER = 1;
 var EXT_SIP_SERVER = 2;
 // Please select dataSrc from above options
 //var dataSrc = LOCAL_MOCK_DATA;
-var dataSrc = EXT_MOCK_SERVER;
-//var dataSrc = EXT_SIP_SERVER;
+//var dataSrc = EXT_MOCK_SERVER;
+var dataSrc = EXT_SIP_SERVER;
 
 // == log level ==
 var LOG_QUIET = 0 // only important log will shown
@@ -257,7 +257,19 @@ var g_extSIPDataSrc = {
   // Convert data from SIP's format(hackathon format) to VSS format
   // TODO: re-write in better way
   // (first version is ad-hoc lazy implementation)
-  convertFormatFromSIPToVSS: function(sipData) {
+  // TODO:
+  //  - SIPからVSSへのデータ変換。外部にテーブルを定義してそれを元に変換する
+  /* 心配事:
+    - この関数は、ZMP形式のデータをVSS形式のデータの配列に変換する
+    - データ項目数が増えると、配列の要素数が増える
+    - 想定最大データ項目数は cartomo=30 + senso=61 = 91
+    - 全部のデータが揃って一度に来る場合はほぼ無い
+    - 発生頻度が非常に低いデータも結構ある
+    - データ間引くことも可能(0.5sec単位とか)
+    - このnodeアプリAWS上で稼働。1プロセスで全利用者の処理をさばく
+  */
+  /*
+  convertFormatFromSIPToVSS_old: function(sipData) {
     var vssData;
     var sipObj;
     try {
@@ -306,9 +318,141 @@ var g_extSIPDataSrc = {
       return undefined;
     }
   },
+  */
+
+  convertHash : {
+    //lat
+    //lng
+    //alt
+    //head
+    //speed
+    'Vehicle.RunningStatus.VehicleSpeed.speed'    : 'Signal.Drivetrain.Transmission.Speed'
+    ,'Vehicle.RunningStatus.EngineSpeed.speed'    : 'Signal.Drivetrain.InternalCombustionEngine.RPM'
+    ,'Vehicle.RunningStatus.SteeringWheel.angle'  : 'Signal.Chassis.SteeringWheel.Angle'
+    ,'Vehicle.RunningStatus.AcceleratorPedalPosition.value'     :'Signal.Chassis.Accelerator.PedalPosition'  //AccelPedal
+    ,'Vehicle.RunningStatus.BrakeOperation.brakePedalDepressed' :'Signal.Chassis.Brake.PedalPosition'  //BrakePedal
+    ,'Vehicle.RunningStatus.ParkingBrake.status'  :'Signal.Chassis.ParkingBrake.IsEngaged'  //ParkingBrake
+    //Accel-x
+    //Accel-y
+    //Acdel-z
+    //Gyro-x
+    //Gyro-y
+    //Gyro-z
+    //Gear
+    ,'Vehicle.RunningStatus.Fuel.Level'                 :'Signal.Drivetrain.FuelSystem.Level'  //FuelLevel
+    ,'Vehicle.RunningStatus.Fuel.instantConsumption'    :'Signal.Drivetrain.FuelSystem.instantConsumption'  //instantFuelConsum
+    //,'Vehicle.RunningStatus.VehiclePowerModetype.value' :'??'  //VehiclePowerMode
+    ,'Vehicle.Maintainance.Odometer.distanceTotal'      :'Signal.OBD.DistanceWithMIL'  //distanceTotal
+    ,'Vehicle.DrivingSafety.Door.Front.Right.status'    :'Signal.Cabin.Door.Row1.Right.IsOpen'  //Door(f-r)
+    ,'Vehicle.DrivingSafety.Door.Front.Left.status'     :'Signal.Cabin.Door.Row1.Left.IsOpen'  //Door(f-l)
+    ,'Vehicle.DrivintSafety.Seat.Front.Right.seatbelt'  :'Signal.Cabin.Seat.Row1.Pos1.IsBelted'  //Seatbelt(f-r)
+    ,'Vehicle.RunningStatus.LightStatus.head'     :'Signal.Body.Light.IsLowBeamOn'  //HeadLight
+    ,'Vehicle.RunningStatus.LightStatus.brake'    :'Signal.Body.Light.IsBrakeOn'  //BrakeLight
+    ,'Vehicle.RunningStatus.LightStatus.parking'  :'Signal.Body.Light.IsParkingOn'  //ParkingLight
+  },
+
+  // ZMP JSON obj を json objのArrayに変換する
+  convertSIPObjToSIPArry: function(_obj) {
+    var resArry = [];
+
+    //再帰で見ていく
+    for ( var key in _obj) {
+      var path = key;
+      findLeaf(key, path, _obj[key]);
+    }
+    return resArry;
+
+    function findLeaf (_key, _path, _obj) {
+      // もし末端に到達したら、末端のobjを返す
+      // 末端であるかの判断は'timeStamp'の存在による(多分大丈夫)
+      if (_obj.timeStamp) {
+        var ts = _obj.timeStamp;
+
+        // Zone情報があったら、pathに front, right などを追加する
+        // e.g. 'Vehicle.DrivingSafety.Door.Front.Left.status'
+        if (_obj.zone !== undefined) {
+          var zone = _obj.zone.value;
+          var row = 'Middle';
+          var col = 'Center';
+          for (var i in zone) {
+            if (zone[i] === 'Front' || zone[i] === 'Rear')      row = zone[i];
+            else if (zone[i] === 'Right' || zone[i] === 'Left') col = zone[i];
+          }
+          _path = _path + '.' + row + '.' + col;
+        }
+
+        // さらにLeafのObjを個別のproperty毎にばらして配列要素とする
+        for ( var key in _obj ) {
+          if (key === 'timeStamp') continue;
+          if (key === 'zone') continue;
+          var path = _path + '.' + key;
+          var val = _obj[key];
+          var item = {'path':path, 'value':val, 'timestamp':ts};
+          resArry.push(item);
+        }
+      } else if (Object.keys(_obj) < 1) {
+        // timeStampがなく、他のkeyも無い場合、空のobjなので何もせず上位に戻る
+        return;
+      } else {
+        // まだ末端でなければ、そのレベルのkeyすべてについて中を見ていく
+        for (var key in _obj) {
+          var path = _path + '.' + key;
+          findLeaf(key, path, _obj[key]);
+        }
+      }
+    }
+  },
+
+  // ZMP定義JSONObjを、VSSデータpathのobj配列に変換する
+  // urata: 
+  convertFormatFromSIPToVSS: function(sipData) {
+    /* 処理方法：
+      - 1) ZMP json obj を配列 ZMP jsonのarray に変換
+        - tree => array はどうやるのがよい???
+      - 2) SIP array を先頭から見て、VSS array に変換
+        - SIP stringをキーとするHash を使って無駄な検索を避ける
+    */
+
+    var vssData;
+    var sipObj;
+    try {
+      sipObj = JSON.parse(sipData);
+    } catch(e) {
+      //iregurlar Json case
+      printLog(LOG_DEFAULT,"  :received irregular Json messaged. ignored.");
+      printLog(LOG_DEFAULT,"  :Error = "+e);
+      return;
+    }
+
+    // ZMP vs VSS のテーブルを使ってデータ取り出し
+    // 全テーブルをループするか？存在するデータのみ処理できるか？
+    var sipArry = this.convertSIPObjToSIPArry(sipObj);
+    // 配列の要素はこんなイメージ
+    // {'path': 'Vehicle.RunningStatus.VehicleSpeed.speed', 'value':'100', 'timestamp':'9999999999'};
+
+    var arryLen = sipArry.length;
+    var vssArry = [];
+    for (var i = 0; i < arryLen; i++) {
+      var vssPath = this.convertHash[sipArry[i].path];
+      if (vssPath === undefined) continue;
+      var item = {'path'      : vssPath,
+                  'value'     : sipArry[i].value,
+                  'timestamp' : sipArry[i].timestamp};
+      vssArry.push(item);
+    }
+
+    if (vssArry.length > 1) {
+      var obj = {'action':'data', "data": vssArry};
+      var vssStr = JSON.stringify(obj);
+      return vssStr;
+    } else {
+      return undefined;
+    }
+  },
 
   // pick out an object from SIP formed JSON by specifing 'path'
   // return value format: {value, timestamp}
+  /*
   getValueFromSIPObj: function(origObj, path) {
     var pathElem = path.split(".");
     var len = pathElem.length;
@@ -318,8 +462,10 @@ var g_extSIPDataSrc = {
       if(obj[pathElem[i]]==undefined) {
         return undefined;
       } else if (i<(len-1) && obj[pathElem[i]]!=undefined) {
+        // Still there is next
         obj = obj[pathElem[i]];
       } else if (i==(len-1) && obj[pathElem[i]]!=undefined) {
+        // Reached to the data!
         retObj = {};
         retObj.value = obj[pathElem[i]];
         retObj.timestamp = obj['timeStamp']; //SIP's timestamp is 'timeStamp'.
@@ -327,6 +473,7 @@ var g_extSIPDataSrc = {
     }
     return retObj;
   }
+  */
 }
 
 if (dataSrc === EXT_SIP_SERVER) {
@@ -347,7 +494,6 @@ if (dataSrc === EXT_SIP_SERVER) {
     });
   }
 }
-
 
 // =============================
 // == session Hash definition ==
@@ -660,7 +806,7 @@ function dataReceiveHandler(message) {
     printLog(LOG_QUIET,"  :Error = "+e);
     return;
   }
-  //console.log("from dataSrc= " + message.substr(0,300));
+  //console.log("dataReceiveHandler data= " + message.substr(0,500));
 
   var dataObj = null;
   var setObj  = null;
@@ -744,6 +890,7 @@ function dataReceiveHandler(message) {
   // handler for 'data' notification from data source
   // handle 'get' and 'subscribe' at here
   } else if (dataObj != undefined) {
+    //printLog(LOG_DEFAULT,"  :dataObj=" + JSON.stringify(dataObj).substr(0,200));
     for (var j in g_sessionHash) {
       var _sessObj = g_sessionHash[j];
       var _reqTable = _sessObj.reqTable;
@@ -786,9 +933,21 @@ function dataReceiveHandler(message) {
   }
 }
 
-function matchPathJson(_reqObj, _dataObj) {
+// _dataObj: mockDataSrcからのJson Obj
+// _reqObj : get, subscribeなどのrequest情報のObj
+function matchPathJson (_reqObj, _dataObj) {
+  if (dataSrc === EXT_SIP_SERVER  ) {
+    // getting data from Hackathon Server case
+    return matchPathJson_SIPDataSrc(_reqObj, _dataObj);
+  } else {
+    // getting data from mockDataSrc case
+    return matchPathJson_mockDataSrc(_reqObj, _dataObj);
+  }
+}
+
+function matchPathJson_mockDataSrc(_reqObj, _dataObj) {
   var reqPath = _reqObj.path;
-  var arrPath = reqPath.split(".");
+  var arrPath = reqPath.split("."); //一つの文字列であるPathを分割して配列にする
   var targObj = _dataObj;
 
   for (var i=0; i<arrPath.length; i++) {
@@ -804,6 +963,20 @@ function matchPathJson(_reqObj, _dataObj) {
         //printLog(LOG_DEFAULT,"  :matchPath:success: data= " + JSON.stringify(targObj));
         return targObj;
       }
+    }
+  }
+}
+
+// Hackathon Serverからデータを取得した場合
+// _dataObj は、VSS 形式のpathを持つ jsonの配列
+function matchPathJson_SIPDataSrc(_reqObj, _dataArry) {
+  var reqPath = _reqObj.path;
+  var obj;
+  for (var i in _dataArry) {
+    obj = _dataArry[i];
+    if (reqPath === obj.path) {
+      console.log('matched!!: obj = ' + JSON.stringify(obj));
+      return obj;
     }
   }
 }
