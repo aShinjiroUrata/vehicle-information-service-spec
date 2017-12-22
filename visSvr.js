@@ -7,14 +7,17 @@
 //   - EXT_MOCK_SERVER : to use external websocket mock server 'mockDataSvr.js'
 //   - EXT_SIP_SERVER  : to use websocket server which hosts actual vehicle data
 //                       developed for SIP hackathon.
-
+//
+// Note:
+//  - hackathonServerで使われてきたZMP定義のデータ形式を便宜的にSIP形式と記載する
 // TODO:
 //  - dataSrc, clientの切断、再接続に対応する。今は手順どおりに起動しないと接続できなかったりする
-//
+//  - どうも、dataSrcは 1インスタンスの前提で書いているコードが結構あるような
+//    一通り洗い出して、修正したい
 
 "use strict"
 
-var g_modSockClient = require('socket.io-client');
+var sockIoClient = require('socket.io-client');
 
 // == Server IP and Port Number ==
 var svr_config = require('./svr_config');
@@ -267,64 +270,13 @@ var g_extSIPDataSrc = {
   // TODO:
   //  - SIPからVSSへのデータ変換。外部にテーブルを定義してそれを元に変換する
   /* 心配事:
-    - この関数は、ZMP形式のデータをVSS形式のデータの配列に変換する
+    - この関数は、SIP形式のデータをVSS形式のデータの配列に変換する
     - データ項目数が増えると、配列の要素数が増える
     - 想定最大データ項目数は cartomo=30 + senso=61 = 91
     - 全部のデータが揃って一度に来る場合はほぼ無い
     - 発生頻度が非常に低いデータも結構ある
     - データ間引くことも可能(0.5sec単位とか)
     - このnodeアプリAWS上で稼働。1プロセスで全利用者の処理をさばく
-  */
-  /*
-  convertFormatFromSIPToVSS_old: function(sipData) {
-    var vssData;
-    var sipObj;
-    try {
-      sipObj = JSON.parse(sipData);
-    } catch(e) {
-      //iregurlar Json case
-      printLog(LOG_DEFAULT,"  :received irregular Json messaged. ignored.");
-      printLog(LOG_DEFAULT,"  :Error = "+e);
-      return;
-    }
-    var vehicleSpeed = this.getValueFromSIPObj(sipObj,"Vehicle.RunningStatus.VehicleSpeed.speed");
-    var engineSpeed = this.getValueFromSIPObj(sipObj,"Vehicle.RunningStatus.EngineSpeed.speed");
-    var steeringWheel = this.getValueFromSIPObj(sipObj,"Vehicle.RunningStatus.SteeringWheel.angle");
-
-    // Create VSS format JSON
-    // TODO: need brush up.
-    var vssObj = new Array();
-    if (vehicleSpeed != undefined) {
-      printLog(LOG_VERBOSE,"  :vehicleSpeed.value=" + vehicleSpeed.value);
-      printLog(LOG_VERBOSE,"  :vehicleSpeed.timestamp=" + vehicleSpeed.timestamp);
-      var obj =
-      { "path": "Signal.Drivetrain.Transmission.Speed",
-        "value": vehicleSpeed.value,
-        "timestamp":vehicleSpeed.timestamp};
-      vssObj.push(obj);
-    }
-    if (engineSpeed != undefined) {
-      var obj =
-      { "path": "Signal.Drivetrain.InternalCombustionEngine.RPM",
-        "value": engineSpeed.value,
-        "timestamp":engineSpeed.timestamp};
-      vssObj.push(obj);
-    }
-    if (steeringWheel != undefined) {
-      var obj =
-      { "path": "Signal.Chassis.SteeringWheel.Angle",
-        "value": steeringWheel.value,
-        "timestamp":steeringWheel.timestamp};
-      vssObj.push(obj);
-    }
-    if (vssObj.length > 1) {
-      var obj = {"data": vssObj};
-      var vssStr = JSON.stringify(obj);
-      return vssStr;
-    } else {
-      return undefined;
-    }
-  },
   */
 
   convertHash : {
@@ -333,7 +285,7 @@ var g_extSIPDataSrc = {
     //alt
     //head
     //speed
-    'Vehicle.RunningStatus.VehicleSpeed.speed'    : 'Signal.Drivetrain.Transmission.Speed'
+     'Vehicle.RunningStatus.VehicleSpeed.speed'    : 'Signal.Drivetrain.Transmission.Speed'
     ,'Vehicle.RunningStatus.EngineSpeed.speed'    : 'Signal.Drivetrain.InternalCombustionEngine.RPM'
     ,'Vehicle.RunningStatus.SteeringWheel.angle'  : 'Signal.Chassis.SteeringWheel.Angle'
     ,'Vehicle.RunningStatus.AcceleratorPedalPosition.value'     :'Signal.Chassis.Accelerator.PedalPosition'  //AccelPedal
@@ -363,25 +315,26 @@ var g_extSIPDataSrc = {
   connectToDataSrc : function(_sessObj) {
     printLog(LOG_DEFAULT , "  :connectToDataSrc");
     // connect to sipDataSrc
-    var sipWsClient = g_modSockClient.connect(g_extSIPDataSrc.svrUrl);
-    _sessObj.wsDataSrc = sipWsClient;
+    var wsSipDataSrc = sockIoClient.connect(g_extSIPDataSrc.svrUrl);
+    _sessObj.wsDataSrc = wsSipDataSrc;
 
     // data received from sipDataSrc
-    sipWsClient.on("vehicle data", function(sipData) {
-      var vssData = g_extSIPDataSrc.convertFormatFromSIPToVSS(sipData);
+    wsSipDataSrc.on("vehicle data", function(sipData) {
+      var vssData = g_extSIPDataSrc.convertFromSIPToVSS(sipData);
       if (vssData != undefined) {
+        //dataReceiveHandler(_sessObj, vssData);
         dataReceiveHandler(vssData);
       }
     });
     // connection to sipDataSrc established !
-    sipWsClient.on('connect',function(){
+    wsSipDataSrc.on('connect',function(){
         printLog(LOG_DEFAULT , "  :extSIPDataSrc: on.connect");
         _sessObj.dataSrcConnected = true;
         // Next step is 'joinRoom' after receive roomId from client
     });
   },
 
-  // ZMP JSON obj を json objのArrayに変換する
+  // SIP JSON obj を json objのArrayに変換する
   convertSIPObjToSIPArry: function(_obj) {
     var resArry = [];
 
@@ -433,11 +386,11 @@ var g_extSIPDataSrc = {
     }
   },
 
-  // ZMP定義JSONObjを、VSSデータpathのobj配列に変換する
+  // SIP定義JSONObjを、VSSデータpathのobj配列に変換する
   // urata: 
-  convertFormatFromSIPToVSS: function(sipData) {
+  convertFromSIPToVSS: function(sipData) {
     /* 処理方法：
-      - 1) ZMP json obj を配列 ZMP jsonのarray に変換
+      - 1) SIP json obj を SIP jsonのarray に変換
         - tree => array はどうやるのがよい???
       - 2) SIP array を先頭から見て、VSS array に変換
         - SIP stringをキーとするHash を使って無駄な検索を避ける
@@ -454,7 +407,7 @@ var g_extSIPDataSrc = {
       return;
     }
 
-    // ZMP vs VSS のテーブルを使ってデータ取り出し
+    // SIP vs VSS のテーブルを使ってデータ取り出し
     // 全テーブルをループするか？存在するデータのみ処理できるか？
     var sipArry = this.convertSIPObjToSIPArry(sipObj);
     // 配列の要素はこんなイメージ
@@ -478,32 +431,7 @@ var g_extSIPDataSrc = {
     } else {
       return undefined;
     }
-  },
-
-  // pick out an object from SIP formed JSON by specifing 'path'
-  // return value format: {value, timestamp}
-  /*
-  getValueFromSIPObj: function(origObj, path) {
-    var pathElem = path.split(".");
-    var len = pathElem.length;
-    var obj = origObj;
-    var retObj = undefined;
-    for (var i=0; i<len; i++) {
-      if(obj[pathElem[i]]==undefined) {
-        return undefined;
-      } else if (i<(len-1) && obj[pathElem[i]]!=undefined) {
-        // Still there is next
-        obj = obj[pathElem[i]];
-      } else if (i==(len-1) && obj[pathElem[i]]!=undefined) {
-        // Reached to the data!
-        retObj = {};
-        retObj.value = obj[pathElem[i]];
-        retObj.timestamp = obj['timeStamp']; //SIP's timestamp is 'timeStamp'.
-      }
-    }
-    return retObj;
   }
-  */
 }
 
 // [ urata ] : dataSrcへの接続部
@@ -522,7 +450,7 @@ if (dataSrc === EXT_SIP_SERVER) {
 
   if (sipWsClient != undefined) {
     sipWsClient.on("vehicle data", function(sipData) {
-      var vssData = g_extSIPDataSrc.convertFormatFromSIPToVSS(sipData);
+      var vssData = g_extSIPDataSrc.convertFromSIPToVSS(sipData);
       if (vssData != undefined) {
         dataReceiveHandler(vssData);
       }
@@ -696,7 +624,7 @@ AuthHash.prototype.ungrantAll = function() {
 // - sipDataSrc に roomIDを通知するタイミングは？
 //   => connectあと、client から joinRoom actionを受け取った時
 //
-vissvr.on('connection', function(ws) {
+vissvr.on('connection', function(_wsCli) {
   // userAppから接続された
 
   // session情報の作成、格納
@@ -704,20 +632,20 @@ vissvr.on('connection', function(ws) {
   var _reqTable = new ReqTable();
   var _authHash = new AuthHash();
 
-  printLog(LOG_DEFAULT,"  :ws.on:connection: sessId= " + _sessId);
+  printLog(LOG_DEFAULT,"  :wsCli.on:connection: sessId= " + _sessId);
 
-  // store sessID, reqTable, ws in a global hash
-  var _sessObj = {'wsClient': ws, 'reqTable': _reqTable, 'authHash': _authHash
+  // store sessID, reqTable, _wsCli in a global hash
+  var _sessObj = {'wsClient': _wsCli, 'reqTable': _reqTable, 'authHash': _authHash
                  // added for h2018
                  ,'wsDataSrc': undefined, 'dataSrcConnected' : false
                  ,'roomId': undefined, 'joined': false};
   g_sessionHash[_sessId] = _sessObj;
 
   // userAppからの接続された契機で sipDataSrcに接続しに行く
-  g_extSIPDataSrc.connectToDataSrc(g_sessionHash[_sessId]);
+  g_extSIPDataSrc.connectToDataSrc(_sessObj);
 
   // for connecting to outside data source
-  ws.on('message', function(message) {
+  _wsCli.on('message', function(message) {
     var obj;
     try {
       obj = JSON.parse(message);
@@ -726,7 +654,7 @@ vissvr.on('connection', function(ws) {
       printLog(LOG_DEFAULT,"  :Error = "+e);
       return;
     }
-    printLog(LOG_DEFAULT,"  :ws.on:message: obj= " + message);
+    printLog(LOG_DEFAULT,"  :wsCli.on:message: obj= " + message);
 
     // NOTE: assuming 1 message contains only 1 method.
     // for 'get'
@@ -765,7 +693,7 @@ vissvr.on('connection', function(ws) {
     if (_sessObj.joined === false) {
       // roomに未joinの場合は、clientからのget, subscribeなどのリクエストは無視する
       printLog(LOG_DEFAULT,"  :Not yet joined to room of HackathonServer");
-      printLog(LOG_DEFAULT,"  :ws.on:message: obj= " + message);
+      printLog(LOG_DEFAULT,"  :wsCli.on:message: obj= " + message);
       return;
     }
 
@@ -793,7 +721,7 @@ vissvr.on('connection', function(ws) {
         var ts = getUnixEpochTimestamp();
         var err = ERR_USER_FORBIDDEN; //TODO better to use detailed actual reason
         resObj = createSetErrorResponse(reqId, err, ts);
-        ws.send(JSON.stringify(resObj));
+        _wsCli.send(JSON.stringify(resObj));
       } else {
         // TODO: for now support extMockDataSrc only. support other dataSrc when needed.
         g_extMockDataSrc.sendSetRequest(obj, reqId, _sessId);
@@ -817,7 +745,7 @@ vissvr.on('connection', function(ws) {
         printLog(LOG_DEFAULT,"  :authorize token check failed.");
         resObj = createAuthorizeErrorResponse(reqId, err);
       }
-      ws.send(JSON.stringify(resObj));
+      _wsCli.send(JSON.stringify(resObj));
 
     } else if (obj.action === "getMetadata") {
       // - VSS json is retrieved from dataSrc
@@ -848,7 +776,7 @@ vissvr.on('connection', function(ws) {
         printLog(LOG_DEFAULT, "  :subscribe started. reqId=" + reqId + ", subId=" + subId + ", path=" + path);
         resObj = createSubscribeSuccessResponse(action, reqId, subId, timestamp);
       }
-      ws.send(JSON.stringify(resObj));
+      _wsCli.send(JSON.stringify(resObj));
 
     } else if (obj.action === "unsubscribe") {
       var reqId = obj.requestId; // unsub requestのreqId
@@ -866,7 +794,7 @@ vissvr.on('connection', function(ws) {
         var err = -1; //TODO: select correct error value
         resObj = createUnsubscribeErrorResponse(obj.action, reqId, targ_subId, err, timestamp);
       }
-      ws.send(JSON.stringify(resObj));
+      _wsCli.send(JSON.stringify(resObj));
 
     } else if (obj.action === "unsubscribeAll") {
       for (var i in _reqTable.subIdHash) {
@@ -878,7 +806,7 @@ vissvr.on('connection', function(ws) {
 
       var timestamp = new Date().getTime().toString(10);
       resObj = createUnsubscribeAllSuccessResponse(obj.action, obj.requestId, timestamp);
-      ws.send(JSON.stringify(resObj));
+      _wsCli.send(JSON.stringify(resObj));
 
     } else {
       //Do nothing
@@ -891,8 +819,8 @@ vissvr.on('connection', function(ws) {
   // - requestは全部クリアする
   // TODO:
   // - sipDataSrcとの接続がcloseした場合、clientとの接続もcloseするべき
-  ws.on('close', function() {
-    printLog(LOG_QUIET,'  :ws.on:closed');
+  _wsCli.on('close', function() {
+    printLog(LOG_QUIET,'  :wsCli.on:closed');
 
     // delete a session
     var sess = g_sessionHash[_sessId];
@@ -907,17 +835,18 @@ vissvr.on('connection', function(ws) {
 });
 
 // Handle data received from data source
-function dataReceiveHandler(message) {
+//function dataReceiveHandler(_sessObj, _msg) {
+function dataReceiveHandler(_msg) {
   var obj;
   try {
-    obj = JSON.parse(message);
+    obj = JSON.parse(_msg);
   } catch(e) {
     //irregurlar Json case
-    printLog(LOG_QUIET,"  :received irregular Json messaged. ignored. msg : "+message);
+    printLog(LOG_QUIET,"  :received irregular Json message. ignored. msg : "+_msg);
     printLog(LOG_QUIET,"  :Error = "+e);
     return;
   }
-  //console.log("dataReceiveHandler data= " + message.substr(0,500));
+  //console.log("dataReceiveHandler data= " + _msg.substr(0,500));
 
   var dataObj = null;
   var setObj  = null;
@@ -939,7 +868,7 @@ function dataReceiveHandler(message) {
 
   // if 'getMetadata' or 'set' response exists..
   if (vssObj || setObj) {
-    //printLog(LOG_DEFAULT,"  :getMetadata message=" + JSON.stringify(vssObj).substr(0,200));
+    //printLog(LOG_DEFAULT,"  :getMetadata msg=" + JSON.stringify(vssObj).substr(0,200));
 
     //[TODO] vssObj setObj 両方あるケースはなかったか？
     var _dataSrcReqId = null;
@@ -951,6 +880,7 @@ function dataReceiveHandler(message) {
 
     do { // for exitting by 'break'
 
+      // ここは extMockDataSrc専用コードになっている
       var _reqIdsessIdObj = g_extMockDataSrc.getReqIdSessIdObj(_dataSrcReqId);
       printLog(LOG_DEFAULT,"  :reqIdsessIdObj=" + JSON.stringify(_reqIdsessIdObj));
       if (_reqIdsessIdObj == undefined) {
@@ -1002,6 +932,16 @@ function dataReceiveHandler(message) {
   // handle 'get' and 'subscribe' at here
   } else if (dataObj != undefined) {
     //printLog(LOG_DEFAULT,"  :dataObj=" + JSON.stringify(dataObj).substr(0,200));
+
+    //urata:ここで、全セッションにデータが渡るようにループさせている！
+    //  - 入ってきたデータがどのセッションのwebsocket(dataSrc)から来ているか？
+    //  - sessionID で照合 or RoomIdで照合して、対応するsessionにしかデータが流れないようにする！
+    //  - roomIdで照合が正しそう
+
+    //      - あるroomIdをつかったsipDataSrcへの接続がすでにある場合、
+    //        同じroomIdの二つめのクライアントは気にせず新規にsipDataSrcへの接続を作成する
+    //
+
     for (var j in g_sessionHash) {
       var _sessObj = g_sessionHash[j];
       var _reqTable = _sessObj.reqTable;
@@ -1031,7 +971,8 @@ function dataReceiveHandler(message) {
 
           } else if (reqObj.action === "subscribe") {
             // send back 'subscribeSuccessResponse'
-            retObj = createSubscriptionNotificationJson(reqObj.subscriptionId, matchObj.value, matchObj.timestamp);
+            retObj = createSubscriptionNotificationJson(reqObj.subscriptionId, matchObj.value, 
+                                                        matchObj.timestamp);
 
             if (_ws != null)
               _ws.send(JSON.stringify(retObj));
