@@ -322,8 +322,7 @@ var g_extSIPDataSrc = {
     wsSipDataSrc.on("vehicle data", function(sipData) {
       var vssData = g_extSIPDataSrc.convertFromSIPToVSS(sipData);
       if (vssData != undefined) {
-        //dataReceiveHandler(_sessObj, vssData);
-        dataReceiveHandler(vssData);
+        dataReceiveHandler(_sessObj, vssData);
       }
     });
     // connection to sipDataSrc established !
@@ -835,8 +834,7 @@ vissvr.on('connection', function(_wsCli) {
 });
 
 // Handle data received from data source
-//function dataReceiveHandler(_sessObj, _msg) {
-function dataReceiveHandler(_msg) {
+function dataReceiveHandler(_sessObj, _msg) {
   var obj;
   try {
     obj = JSON.parse(_msg);
@@ -942,8 +940,7 @@ function dataReceiveHandler(_msg) {
     //        同じroomIdの二つめのクライアントは気にせず新規にsipDataSrcへの接続を作成する
     //
 
-    for (var j in g_sessionHash) {
-      var _sessObj = g_sessionHash[j];
+    {
       var _reqTable = _sessObj.reqTable;
       var _ws = _sessObj.wsClient;
       for (var i in _reqTable.requestHash) {
