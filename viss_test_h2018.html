@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <!-- test-ui.html  -->
 <!-- Copyright (c) 2017 ACCESS CO., LTD. All rights reserved. -->
+<!--
+ Note:
+ - hackathon serverをdataSrcとした場合、get, subscribe以外のactionは使えない
+ - mockDataSrc をdataSrcとした場合は、テスト目的でそれ以外のactionもサポートしている
+-->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -49,7 +54,8 @@
 <body>
   <header id="header">
     <h3> Vehicle Information Service Spec Test UI </h3>
-    <span id="server_info"></span>
+    <span id="server_info"></span><br>
+    RoomID <input type='text' id='roomid' value='0100'></input>
     <br>
   </header>
 
@@ -135,6 +141,7 @@
 
   var SUBPROTOCOL = "wvss1.0";
   var VSS_FILENAME = "vss.json";
+
   var g_vehicle = null; // only one WebSocket connection is allowed
   var g_reqTable = null;
   var g_vssObj = null; // VSS object loaded from vss.json
@@ -292,6 +299,19 @@
   // ===================
   function onWsOpen() {
     showInMsgArea("onWsOpen: Connection opened");
+
+    // 接続したら、joinRoomをリクエストする
+    // 他のrequest と違い reqId不要。callbackなし(responseは戻らない)
+    // なので、request tableに登録もしない
+    sendJoinRoomRequest();
+  }
+  function sendJoinRoomRequest() {
+    //urata
+    var roomId = document.getElementById('roomid').value;
+    var objRoomId = {'action': 'joinRoom', 'roomId': roomId};
+    var json_str = JSON.stringify(objRoomId);
+    showInMsgArea("sendJoinRoom: objRoomId = " + json_str);
+    g_vehicle.send(json_str);
   }
   function onWsClose() {
     showInMsgArea("onWsClose: Connection closed");
