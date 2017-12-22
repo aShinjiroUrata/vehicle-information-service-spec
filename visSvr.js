@@ -8,7 +8,13 @@
 //   - EXT_SIP_SERVER  : to use websocket server which hosts actual vehicle data
 //                       developed for SIP hackathon.
 
+// TODO:
+//  - dataSrc, clientの切断、再接続に対応する。今は手順どおりに起動しないと接続できなかったりする
+//
+
 "use strict"
+
+var g_modSockClient = require('socket.io-client');
 
 // == Server IP and Port Number ==
 var svr_config = require('./svr_config');
@@ -70,8 +76,9 @@ function selectProtocols(protocols) {
   return SUBPROTOCOL;
 };
 
+// [ urata ] : clientからの接続を受けるWebSocketの生成
 var WebSocketServer = require('ws').Server;
-var wssvr = new WebSocketServer({
+var vissvr = new WebSocketServer({
   host : VISS_IP,
   port : VISS_PORT,
   handleProtocols : selectProtocols 
@@ -351,6 +358,29 @@ var g_extSIPDataSrc = {
     ,'Vehicle.RunningStatus.LightStatus.parking'  :'Signal.Body.Light.IsParkingOn'  //ParkingLight
   },
 
+  // urata: working
+  // TODO: sipDataSrc と mockDataSrcの使い分けはどうする？
+  connectToDataSrc : function(_sessObj) {
+    printLog(LOG_DEFAULT , "  :connectToDataSrc");
+    // connect to sipDataSrc
+    var sipWsClient = g_modSockClient.connect(g_extSIPDataSrc.svrUrl);
+    _sessObj.wsDataSrc = sipWsClient;
+
+    // data received from sipDataSrc
+    sipWsClient.on("vehicle data", function(sipData) {
+      var vssData = g_extSIPDataSrc.convertFormatFromSIPToVSS(sipData);
+      if (vssData != undefined) {
+        dataReceiveHandler(vssData);
+      }
+    });
+    // connection to sipDataSrc established !
+    sipWsClient.on('connect',function(){
+        printLog(LOG_DEFAULT , "  :extSIPDataSrc: on.connect");
+        _sessObj.dataSrcConnected = true;
+        // Next step is 'joinRoom' after receive roomId from client
+    });
+  },
+
   // ZMP JSON obj を json objのArrayに変換する
   convertSIPObjToSIPArry: function(_obj) {
     var resArry = [];
@@ -476,24 +506,35 @@ var g_extSIPDataSrc = {
   */
 }
 
+// [ urata ] : dataSrcへの接続部
+// - VISS起動したらすぐにdataSrcに接続に行っている
+// - client接続が発生 => serverに接続 の流れにしたい
+// - ここで、user appから取得したroomIDも指定するようにしたい
+//
+//urata: 以下のOrigの sipDataSrcへの接続処理は一旦停止
+/*
 if (dataSrc === EXT_SIP_SERVER) {
-  var modSioClient = require('socket.io-client');
-  var sioClient = modSioClient.connect(g_extSIPDataSrc.svrUrl);
+  var modSockClient = require('socket.io-client');
+  // [ urata ]
+  // すぐに接続に行っているが
+  // そうでなくuserAppの接続を待って、dataSrcに接続したい
+  var sipWsClient = modSockClient.connect(g_extSIPDataSrc.svrUrl);
 
-  if (sioClient != undefined) {
-    sioClient.on("vehicle data", function(sipData) {
+  if (sipWsClient != undefined) {
+    sipWsClient.on("vehicle data", function(sipData) {
       var vssData = g_extSIPDataSrc.convertFormatFromSIPToVSS(sipData);
       if (vssData != undefined) {
         dataReceiveHandler(vssData);
       }
     });
-    sioClient.on('connect',function(){
+    sipWsClient.on('connect',function(){
         printLog(LOG_QUIET,"on.connect");
         var msg = {"roomID":g_extSIPDataSrc.roomID, "data":"NOT REQUIRED"};
-        sioClient.emit('joinRoom', JSON.stringify(msg));
+        sipWsClient.emit('joinRoom', JSON.stringify(msg));
     });
   }
 }
+*/
 
 // =============================
 // == session Hash definition ==
@@ -640,16 +681,40 @@ AuthHash.prototype.ungrantAll = function() {
   printLog(LOG_DEFAULT,"  :AuthHash=" + JSON.stringify(this.hash));
 }
 
-wssvr.on('connection', function(ws) {
+// [ urata ] : clientからのconnect受付部分
+// - clientが接続に来たときに、dataSrcへの接続が失敗した場合は
+//   sessionの情報は残す？=> 残さない。clientには接続失敗と通知、
+//   その場合、vissvrとのconnectionは、disconenct状態にする
+// - clientは vissvrへのconn/disconnは自由に可能。
+// - clientは、一度disconnして、roomIDを変更して再接続することも可能
+// - ただし接続手順は普通、hkServer側で、roomIDを登録して起動、
+//   あとからclient側でroomIDを指定して接続に行く
+// - clientを先に起動しておいて、後からhkserverでroomIDを指定して起動すると
+//   待っていたclientのconnectionが繋がる、という手順は多分やらない。
+// - それ以外の順序は、考慮してもあまり意味がない
+//
+// - sipDataSrc に roomIDを通知するタイミングは？
+//   => connectあと、client から joinRoom actionを受け取った時
+//
+vissvr.on('connection', function(ws) {
+  // userAppから接続された
 
+  // session情報の作成、格納
   var _sessId = createNewSessID();
   var _reqTable = new ReqTable();
   var _authHash = new AuthHash();
- 
+
   printLog(LOG_DEFAULT,"  :ws.on:connection: sessId= " + _sessId);
 
   // store sessID, reqTable, ws in a global hash
-  g_sessionHash[_sessId] = {'ws': ws, 'reqTable': _reqTable, 'authHash': _authHash};
+  var _sessObj = {'wsClient': ws, 'reqTable': _reqTable, 'authHash': _authHash
+                 // added for h2018
+                 ,'wsDataSrc': undefined, 'dataSrcConnected' : false
+                 ,'roomId': undefined, 'joined': false};
+  g_sessionHash[_sessId] = _sessObj;
+
+  // userAppからの接続された契機で sipDataSrcに接続しに行く
+  g_extSIPDataSrc.connectToDataSrc(g_sessionHash[_sessId]);
 
   // for connecting to outside data source
   ws.on('message', function(message) {
@@ -657,14 +722,53 @@ wssvr.on('connection', function(ws) {
     try {
       obj = JSON.parse(message);
     } catch (e) {
-      printLog(LOG_QUIET,"  :received irregular Json messaged. ignored. msg = "+message);
-      printLog(LOG_QUIET,"  :Error = "+e);
+      printLog(LOG_DEFAULT,"  :received irregular Json messaged. ignored. msg = "+message);
+      printLog(LOG_DEFAULT,"  :Error = "+e);
       return;
     }
     printLog(LOG_DEFAULT,"  :ws.on:message: obj= " + message);
 
     // NOTE: assuming 1 message contains only 1 method.
     // for 'get'
+
+    // urata: added for h2018
+    if (obj.action === 'joinRoom'
+        // if receive 'joinRoom' after already joined, ignore it.
+        && _sessObj.joined === false) {
+
+      var rmId = obj.roomId;
+      printLog(LOG_QUIET,"  :action:joinRoom: " + rmId);
+      _sessObj.roomId = rmId;
+      var msg = JSON.stringify({"roomID": rmId, "data":"NOT REQUIRED"});
+
+      // sipDataSrc に roomIdを通知してjoinRoom
+      sendJoinRoom(msg);
+
+      function sendJoinRoom(_msg) {
+        // client から action:joinRoom が来たときに
+        // sipDataSrc との接続が確立している保証がない。
+        // - 接続済みなら、すぐに sipDataSrcに joinRoom送信
+        // - 未接続なら、接続を待つためタイマー発行
+        if (_sessObj.dataSrcConnected === false) {
+          printLog(LOG_DEFAULT,"  :sendJoinRoom(): try again later");
+          setTimeout( function(){sendJoinRoom(_msg);}, 1000);
+        } else {
+          printLog(LOG_DEFAULT,"  :sendJoinRoom(): join now!");
+          _sessObj.wsDataSrc.emit('joinRoom', _msg);
+          // 'joined' フラグを立てる
+          //  roomが存在しない可能性もあるが、気にせず true とする
+          _sessObj.joined = true;
+          printLog(LOG_DEFAULT,"  :--joined!! ");
+        }
+      }
+    }
+    if (_sessObj.joined === false) {
+      // roomに未joinの場合は、clientからのget, subscribeなどのリクエストは無視する
+      printLog(LOG_DEFAULT,"  :Not yet joined to room of HackathonServer");
+      printLog(LOG_DEFAULT,"  :ws.on:message: obj= " + message);
+      return;
+    }
+
     if (obj.action === "get") {
       var reqId = obj.requestId;
       var path = obj.path;
@@ -781,13 +885,20 @@ wssvr.on('connection', function(ws) {
     }
   });
 
+  // [ urata ] : TODO:
+  // clientとの接続closeイベント
+  // - dataSrc への接続をcloseする
+  // - requestは全部クリアする
+  // TODO:
+  // - sipDataSrcとの接続がcloseした場合、clientとの接続もcloseするべき
   ws.on('close', function() {
     printLog(LOG_QUIET,'  :ws.on:closed');
-    _reqTable.clearReqTable();
 
     // delete a session
     var sess = g_sessionHash[_sessId];
-    sess.ws = null;
+    sess.wsClient = null;
+    sess.wsDataSrc.disconnect(); // sipDataSrc との接続をcloseする
+    _reqTable.clearReqTable();
 
     delete sess.reqTable;
     delete sess.authHash;
@@ -852,7 +963,7 @@ function dataReceiveHandler(message) {
 
       var _sessObj = g_sessionHash[_sessId];
       var _reqTable = _sessObj.reqTable;
-      var _ws = _sessObj.ws;
+      var _ws = _sessObj.wsClient;
       var _reqObj = _reqTable.requestHash[_reqId];
 
       // for getMetadata response
@@ -894,7 +1005,7 @@ function dataReceiveHandler(message) {
     for (var j in g_sessionHash) {
       var _sessObj = g_sessionHash[j];
       var _reqTable = _sessObj.reqTable;
-      var _ws = _sessObj.ws;
+      var _ws = _sessObj.wsClient;
       for (var i in _reqTable.requestHash) {
         reqObj = _reqTable.requestHash[i];
         if (reqObj.action != 'get' && reqObj.action != 'subscribe') {
@@ -972,6 +1083,8 @@ function matchPathJson_mockDataSrc(_reqObj, _dataObj) {
 function matchPathJson_SIPDataSrc(_reqObj, _dataArry) {
   var reqPath = _reqObj.path;
   var obj;
+  //urata: ここはループで探している。
+  //  ループしないでできないか？
   for (var i in _dataArry) {
     obj = _dataArry[i];
     if (reqPath === obj.path) {
