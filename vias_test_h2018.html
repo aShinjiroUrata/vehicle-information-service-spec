@@ -144,6 +144,7 @@ function doGetSpeed() {
     return;
   }
   // get method test
+  showInMsgArea("Get Speed");
   vias.get(VSS_SPEED,
     function(_val) {
       showInMsgArea(`get speed:success: val= ${_val}`);
@@ -158,6 +159,7 @@ function doSubscribe(_refval) {
     showInMsgArea("WebSocket not connected");
     return;
   }
+  showInMsgArea("Subscribe " + _refval.path);
   _refval.subId = vias.subscribe(_refval.path, _refval.sucCb, _refval.errCb);
 }
 function doSubscribeSpeed() {
@@ -243,6 +245,7 @@ function doGetDoorlock() {
     showInMsgArea("WebSocket not connected");
     return;
   }
+  showInMsgArea("Get Doorlock");
   // get method test
   vias.get(VSS_DOORLOCK,
     function(_val) {

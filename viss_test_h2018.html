@@ -529,6 +529,7 @@
     }
   }
   function btnGetMetadata() {
+    showInMsgArea("getMetadata");
     var path = getMetadataPath();
     wsGetMetadata(path);
   }
@@ -540,6 +541,7 @@
   // === get ===
   function wsGetItem(_path, _dispId) {
     if (g_vehicle != null && g_vehicle.readyState === WS_OPEN) {
+      showInMsgArea("Get " + _path);
       var reqId = getUniqueReqId();
       var req = {"action": "get", "path": _path, "requestId":reqId};
       var item = {"reqObj": req, "dispId": _dispId}; //戻り値の表示先IDを追加
@@ -562,8 +564,8 @@
   // === set ===
   // in case of 'set', dispId may not needed..
   function wsSetItem(path,value, _dispId) {
-    showInMsgArea("wsSetItem:");
     if (g_vehicle != null && g_vehicle.readyState === WS_OPEN) {
+      showInMsgArea("Set " + _path);
       var reqId = getUniqueReqId();
       var req = {"action": "set", "path": path, "value": value, "requestId":reqId};
       var item = {"reqObj": req, "dispId": _dispId}; //戻り値の表示先IDを追加
@@ -591,8 +593,9 @@
 
   // === subscribe/unsubscribe ===
   function wsSubscribeItem(path, reqId, _dispId) {
-    showInMsgArea("wsSubscribeItem: reqId = " + reqId);
+    //showInMsgArea("wsSubscribeItem: reqId = " + reqId);
     if (g_vehicle != null && g_vehicle.readyState === WS_OPEN) {
+      showInMsgArea("Subscribe " + path);
       var req ={"action": "subscribe", "path": path, "filters":"", "requestId":reqId};
       var item = {"reqObj": req, "dispId": _dispId}; //戻り値の表示先IDを追加
       g_reqTable.addRequest(reqId, item);
@@ -605,8 +608,9 @@
     }
   }
   function wsUnsubscribeItem(path, subId, _dispId) {
-    showInMsgArea("wsUnsubscribeItem: subId=" + subId);
+    //showInMsgArea("wsUnsubscribeItem: subId=" + subId);
     if (g_vehicle != null && g_vehicle.readyState === WS_OPEN) {
+      showInMsgArea("Unsubscribe " + path);
       var reqId = getUniqueReqId(); //reqIdはunsub用に新しいものを使用
       var req = {"action": "unsubscribe", "requestId":reqId, "subscriptionId":subId};
       var item = {"reqObj": req, "dispId": _dispId}; //戻り値の表示先IDを追加
@@ -617,8 +621,9 @@
     }
   }
   function wsUnsubscribeAll( ) {
-    showInMsgArea("wsUnsubscribeAll: subId=");
+    //showInMsgArea("wsUnsubscribeAll: subId=");
     if (g_vehicle != null && g_vehicle.readyState === WS_OPEN) {
+      showInMsgArea("UnsubscribeAll ");
       var reqId = getUniqueReqId(); //reqIdはunsub用に新しいものを使用
       var req = {"action": "unsubscribeAll", "requestId":reqId};
       var item = {"reqObj": req, "dispId": ""}; //戻り値の表示先IDを追加
