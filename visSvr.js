@@ -14,7 +14,10 @@
 //  - dataSrc, clientの切断、再接続に対応する。今は手順どおりに起動しないと接続できなかったりする
 //  - どうも、dataSrcは 1インスタンスの前提で書いているコードが結構あるような
 //    一通り洗い出して、修正したい
-
+//  - データ項目の形式について
+//    - SIP形式: SIP Prj/ハッカソン向けに作成した車両データ形式
+//    - VSS形式: W3C Autotive WGで採用された、GeNIVI Vehicle Signal Specで定義された車両データ形式
+//
 "use strict"
 
 var sockIoClient = require('socket.io-client');
@@ -160,7 +163,6 @@ if (dataSrc === LOCAL_MOCK_DATA) {
 // == dataSrc connection: external mock data server ==
 // ===================================================
 // * Connect as client
-
 var g_extMockDataSrc = (function() {
 
   var m_svrUrl = "ws://"+EXT_MOCKSVR_IP+":"+EXT_MOCKSVR_PORT;
@@ -279,7 +281,10 @@ var g_extSIPDataSrc = {
     - このnodeアプリAWS上で稼働。1プロセスで全利用者の処理をさばく
   */
 
+  // SIP形式PathをVSS形式に置き換えるためのHash
+  // ただし、SIP形式のPathと言っても、Zoneの部分を無理やりPathに入れ込む一時対応をしてある
   convertHash : {
+    // == Vehicle Data ==
     //lat
     //lng
     //alt
@@ -302,24 +307,26 @@ var g_extSIPDataSrc = {
     ,'Vehicle.RunningStatus.Fuel.instantConsumption'    :'Signal.Drivetrain.FuelSystem.instantConsumption'  //instantFuelConsum
     //,'Vehicle.RunningStatus.VehiclePowerModetype.value' :'??'  //VehiclePowerMode
     ,'Vehicle.Maintainance.Odometer.distanceTotal'      :'Signal.OBD.DistanceWithMIL'  //distanceTotal
-    ,'Vehicle.DrivingSafety.Door.Front.Right.status'    :'Signal.Cabin.Door.Row1.Right.IsOpen'  //Door(f-r)
-    ,'Vehicle.DrivingSafety.Door.Front.Left.status'     :'Signal.Cabin.Door.Row1.Left.IsOpen'  //Door(f-l)
-    ,'Vehicle.DrivintSafety.Seat.Front.Right.seatbelt'  :'Signal.Cabin.Seat.Row1.Pos1.IsBelted'  //Seatbelt(f-r)
+    ,'Vehicle.DrivingSafety.Door.Front.Right.status'    :'Signal.Cabin.Door.Row1.Right.IsOpen'    //Door(f-r)     //Zone項目
+    ,'Vehicle.DrivingSafety.Door.Front.Left.status'     :'Signal.Cabin.Door.Row1.Left.IsOpen'     //Door(f-l)     //Zone項目
+    ,'Vehicle.DrivintSafety.Seat.Front.Right.seatbelt'  :'Signal.Cabin.Seat.Row1.Pos1.IsBelted'   //Seatbelt(f-r) //Zone項目
     ,'Vehicle.RunningStatus.LightStatus.head'     :'Signal.Body.Light.IsLowBeamOn'  //HeadLight
-    ,'Vehicle.RunningStatus.LightStatus.brake'    :'Signal.Body.Light.IsBrakeOn'  //BrakeLight
+    ,'Vehicle.RunningStatus.LightStatus.brake'    :'Signal.Body.Light.IsBrakeOn'    //BrakeLight
     ,'Vehicle.RunningStatus.LightStatus.parking'  :'Signal.Body.Light.IsParkingOn'  //ParkingLight
+    // == Sensor Data ==
+    // TODO: 以下に追加していく
   },
 
-  // urata: working
   // TODO: sipDataSrc と mockDataSrcの使い分けはどうする？
   connectToDataSrc : function(_sessObj) {
     printLog(LOG_DEFAULT , "  :connectToDataSrc");
     // connect to sipDataSrc
     var wsSipDataSrc = sockIoClient.connect(g_extSIPDataSrc.svrUrl);
-    _sessObj.wsDataSrc = wsSipDataSrc;
+    _sessObj.wsDataSrc = wsSipDataSrc;  //session Obj に dataSrc向けwsを保存
 
     // data received from sipDataSrc
     wsSipDataSrc.on("vehicle data", function(sipData) {
+      // sipDataSrcからのSIP形式データをVSS形式に変換する
       var vssData = g_extSIPDataSrc.convertFromSIPToVSS(sipData);
       if (vssData != undefined) {
         dataReceiveHandler(_sessObj, vssData);
@@ -333,7 +340,11 @@ var g_extSIPDataSrc = {
     });
   },
 
-  // SIP JSON obj を json objのArrayに変換する
+  // SIP JSON obj を json objのArrayに変換する。結果データは以下のイメージ
+  // resArry = [
+  //   {'path':'Vehicle.RunningStatus.Fuel.Level', 'value':'60', 'timestamp':'999999'},
+  //   {'path':'Vehicle.RunningStatus.VehicleSpeed.speed', 'value':'60', 'timestamp':'999999'},
+  // ]
   convertSIPObjToSIPArry: function(_obj) {
     var resArry = [];
 
@@ -346,12 +357,14 @@ var g_extSIPDataSrc = {
 
     function findLeaf (_key, _path, _obj) {
       // もし末端に到達したら、末端のobjを返す
-      // 末端であるかの判断は'timeStamp'の存在による(多分大丈夫)
+      // 末端であるかの判断は'timeStamp'の有無による(多分大丈夫)
       if (_obj.timeStamp) {
+        // objがtimeStampを持つので、このobjは末端のLeaf objである
         var ts = _obj.timeStamp;
 
         // Zone情報があったら、pathに front, right などを追加する
         // e.g. 'Vehicle.DrivingSafety.Door.Front.Left.status'
+        // TODO: Zone関連動作 要確認 (Door, Seatbelt程度)
         if (_obj.zone !== undefined) {
           var zone = _obj.zone.value;
           var row = 'Middle';
@@ -385,14 +398,11 @@ var g_extSIPDataSrc = {
     }
   },
 
-  // SIP定義JSONObjを、VSSデータpathのobj配列に変換する
-  // urata: 
+  // SIP形式の走行データObjを、VSS形式データ項目毎のobjに分割、Hashにまとめる
   convertFromSIPToVSS: function(sipData) {
     /* 処理方法：
       - 1) SIP json obj を SIP jsonのarray に変換
-        - tree => array はどうやるのがよい???
-      - 2) SIP array を先頭から見て、VSS array に変換
-        - SIP stringをキーとするHash を使って無駄な検索を避ける
+      - 2) SIPのarray を、VSSのHash に変換
     */
 
     var vssData;
@@ -406,25 +416,28 @@ var g_extSIPDataSrc = {
       return;
     }
 
-    // SIP vs VSS のテーブルを使ってデータ取り出し
-    // 全テーブルをループするか？存在するデータのみ処理できるか？
-    var sipArry = this.convertSIPObjToSIPArry(sipObj);
-    // 配列の要素はこんなイメージ
+    // SIP形式のObjを、SIPデータ項目別のObjの配列に変換
+    // SIP形式Obj配列の要素はこんなイメージ
     // {'path': 'Vehicle.RunningStatus.VehicleSpeed.speed', 'value':'100', 'timestamp':'9999999999'};
+    var sipArry = this.convertSIPObjToSIPArry(sipObj);
 
+    // SIPデータ形式Objの配列 => VSS形式のHashに変換
+    // (以降のmatching処理で、ループによる照合の無駄排除のためHash形式にする)
     var arryLen = sipArry.length;
-    var vssArry = [];
+    var vssHash = {};
     for (var i = 0; i < arryLen; i++) {
       var vssPath = this.convertHash[sipArry[i].path];
       if (vssPath === undefined) continue;
       var item = {'path'      : vssPath,
                   'value'     : sipArry[i].value,
                   'timestamp' : sipArry[i].timestamp};
-      vssArry.push(item);
+      // ArrayでなくHashにする。Pathがキー
+      vssHash[vssPath] = item;
     }
 
-    if (vssArry.length > 1) {
-      var obj = {'action':'data', "data": vssArry};
+    var len = Object.keys(vssHash).length;
+    if (len > 1) {
+      var obj = {'action':'data', "data": vssHash};
       var vssStr = JSON.stringify(obj);
       return vssStr;
     } else {
@@ -432,36 +445,6 @@ var g_extSIPDataSrc = {
     }
   }
 }
-
-// [ urata ] : dataSrcへの接続部
-// - VISS起動したらすぐにdataSrcに接続に行っている
-// - client接続が発生 => serverに接続 の流れにしたい
-// - ここで、user appから取得したroomIDも指定するようにしたい
-//
-//urata: 以下のOrigの sipDataSrcへの接続処理は一旦停止
-/*
-if (dataSrc === EXT_SIP_SERVER) {
-  var modSockClient = require('socket.io-client');
-  // [ urata ]
-  // すぐに接続に行っているが
-  // そうでなくuserAppの接続を待って、dataSrcに接続したい
-  var sipWsClient = modSockClient.connect(g_extSIPDataSrc.svrUrl);
-
-  if (sipWsClient != undefined) {
-    sipWsClient.on("vehicle data", function(sipData) {
-      var vssData = g_extSIPDataSrc.convertFromSIPToVSS(sipData);
-      if (vssData != undefined) {
-        dataReceiveHandler(vssData);
-      }
-    });
-    sipWsClient.on('connect',function(){
-        printLog(LOG_QUIET,"on.connect");
-        var msg = {"roomID":g_extSIPDataSrc.roomID, "data":"NOT REQUIRED"};
-        sipWsClient.emit('joinRoom', JSON.stringify(msg));
-    });
-  }
-}
-*/
 
 // =============================
 // == session Hash definition ==
@@ -674,8 +657,8 @@ vissvr.on('connection', function(_wsCli) {
       function sendJoinRoom(_msg) {
         // client から action:joinRoom が来たときに
         // sipDataSrc との接続が確立している保証がない。
-        // - 接続済みなら、すぐに sipDataSrcに joinRoom送信
         // - 未接続なら、接続を待つためタイマー発行
+        // - 接続済みなら、すぐに sipDataSrcに joinRoom送信
         if (_sessObj.dataSrcConnected === false) {
           printLog(LOG_DEFAULT,"  :sendJoinRoom(): try again later");
           setTimeout( function(){sendJoinRoom(_msg);}, 1000);
@@ -683,14 +666,14 @@ vissvr.on('connection', function(_wsCli) {
           printLog(LOG_DEFAULT,"  :sendJoinRoom(): join now!");
           _sessObj.wsDataSrc.emit('joinRoom', _msg);
           // 'joined' フラグを立てる
-          //  roomが存在しない可能性もあるが、気にせず true とする
+          //  roomが存在しない可能性もあるが、joinは可能なので true とする
           _sessObj.joined = true;
           printLog(LOG_DEFAULT,"  :--joined!! ");
         }
       }
     }
+    // roomに未joinの場合は、clientからのget, subscribeのリクエスト来てもスルー
     if (_sessObj.joined === false) {
-      // roomに未joinの場合は、clientからのget, subscribeなどのリクエストは無視する
       printLog(LOG_DEFAULT,"  :Not yet joined to room of HackathonServer");
       printLog(LOG_DEFAULT,"  :wsCli.on:message: obj= " + message);
       return;
@@ -812,12 +795,11 @@ vissvr.on('connection', function(_wsCli) {
     }
   });
 
-  // [ urata ] : TODO:
   // clientとの接続closeイベント
   // - dataSrc への接続をcloseする
   // - requestは全部クリアする
   // TODO:
-  // - sipDataSrcとの接続がcloseした場合、clientとの接続もcloseするべき
+  // - sipDataSrcとの接続が意図せずcloseした場合、clientとの接続もcloseするべき
   _wsCli.on('close', function() {
     printLog(LOG_QUIET,'  :wsCli.on:closed');
 
@@ -931,14 +913,11 @@ function dataReceiveHandler(_sessObj, _msg) {
   } else if (dataObj != undefined) {
     //printLog(LOG_DEFAULT,"  :dataObj=" + JSON.stringify(dataObj).substr(0,200));
 
-    //urata:ここで、全セッションにデータが渡るようにループさせている！
-    //  - 入ってきたデータがどのセッションのwebsocket(dataSrc)から来ているか？
-    //  - sessionID で照合 or RoomIdで照合して、対応するsessionにしかデータが流れないようにする！
-    //  - roomIdで照合が正しそう
-
-    //      - あるroomIdをつかったsipDataSrcへの接続がすでにある場合、
-    //        同じroomIdの二つめのクライアントは気にせず新規にsipDataSrcへの接続を作成する
-    //
+    // TODO:
+    //  - h2018向けに、一つのdataSrcからのデータを全Client sessionに行き渡らせる処理を削除した
+    //  - sipDataSrc向けにはこれでよいが、mockDataSrc向けにも処理が正しく流れるようにすること
+    //  - mockDataSrc向けにもsipDataSrcの場合と同じく、1client sessionが一つのdataSrc接続を
+    //    専有するように変更するのがよさそう
 
     {
       var _reqTable = _sessObj.reqTable;
@@ -985,6 +964,8 @@ function dataReceiveHandler(_sessObj, _msg) {
 // _dataObj: mockDataSrcからのJson Obj
 // _reqObj : get, subscribeなどのrequest情報のObj
 function matchPathJson (_reqObj, _dataObj) {
+  // 流れてくるdataObjの形式が違うため、
+  // sipDataSrc向け、mockDataSrc向けで処理を分けた
   if (dataSrc === EXT_SIP_SERVER  ) {
     // getting data from Hackathon Server case
     return matchPathJson_SIPDataSrc(_reqObj, _dataObj);
@@ -1018,17 +999,14 @@ function matchPathJson_mockDataSrc(_reqObj, _dataObj) {
 
 // Hackathon Serverからデータを取得した場合
 // _dataObj は、VSS 形式のpathを持つ jsonの配列
-function matchPathJson_SIPDataSrc(_reqObj, _dataArry) {
+function matchPathJson_SIPDataSrc(_reqObj, _dataHash) {
   var reqPath = _reqObj.path;
   var obj;
-  //urata: ここはループで探している。
-  //  ループしないでできないか？
-  for (var i in _dataArry) {
-    obj = _dataArry[i];
-    if (reqPath === obj.path) {
-      console.log('matched!!: obj = ' + JSON.stringify(obj));
-      return obj;
-    }
+  // sipDataSrcの場合、dataObjがHashになっているので、ループで照合は不要になった
+  if (_dataHash[reqPath] !== undefined) {
+    obj = _dataHash[reqPath];
+    console.log('matchPathJson_Hash: matched!!: obj = ' + JSON.stringify(obj));
+    return obj;
   }
 }
 
