@@ -64,10 +64,23 @@ body{
     <button type="button" class="btn" id="idBtnGetDoorlock">Get Doorlock</button><br>
     <span id="idSpanDoorlock" >* Doorlock = Row2 Right Door's lock</span>
     <br>
-    <br>
     <button type="button" class="btn" id="idBtnAuthorize">Authorize</button><br>
-    <br>
     <button type="button" class="btn" id="idBtnGetVss">getVss</button><br>
+    <br>
+    <!-- Promise test -->
+    === Promise Test ===
+    <br>
+    <button type="button" class="btn" id="idBtnPromiseConnect">Connect</button><br>
+    <button type="button" class="btn" id="idBtnPromiseDisconnect">Disconnect</button><br>
+    <br>
+    <button type="button" class="btn" id="idBtnPromiseGetSpeed">Get Speed</button><br>
+    <button type="button" class="btn" id="idBtnMultiPromiseGet">Multi Get<br>(Speed, RPM, Steer)</button><br>
+    <button type="button" class="btn" id="idBtnPromiseUnsubscribeSpeed">Unsubscribe Speed</button><br>
+    <button type="button" class="btn" id="idBtnPromiseUnsubscribeAll">UnsubscribeAll</button><br>
+    <button type="button" class="btn" id="idBtnPromiseSetDoorlockTrue">Set</button><br>
+    <button type="button" class="btn" id="idBtnPromiseAuthorize">Authorize</button><br>
+    <button type="button" class="btn" id="idBtnPromiseGetVss">getVss</button><br>
+
   </main>
 
   <div id='right'>
@@ -79,8 +92,9 @@ body{
 
 </body>
 <script>
-var VSS_SPEED = 'Signal.Drivetrain.Transmission.Speed';
-var VSS_RPM = 'Signal.Drivetrain.InternalCombustionEngine.RPM';
+var VSS_SPEED    = 'Signal.Drivetrain.Transmission.Speed';
+var VSS_RPM      = 'Signal.Drivetrain.InternalCombustionEngine.RPM';
+var VSS_STEER    = 'Signal.Chassis.SteeringWheel.Angle';
 var VSS_DOORLOCK = 'Signal.Cabin.Door.Row1.Right.IsLocked';
 //var VSS_DOORLOCK = 'Signal.Cabin.Door.Row2.Right.IsLocked';
 
@@ -128,6 +142,19 @@ function doConnect() {
   vias = new VISClient( viscOption );
   vias.connect(connectCb, connectErrCb);
 }
+function doPromiseConnect() {
+  if (vias !== undefined || bConnected) {
+    showInMsgArea("WebSocket already connected");
+    return;
+  }
+  viscOption.roomId = document.getElementById('roomid').value;
+  vias = new VISClient( viscOption );
+  vias.connect().then( ()=>{
+    connectCb();
+  }, (_err) => {
+    connectErrCb(_err);
+  });
+}
 
 function doDisconnect() {
    if (vias === undefined || !bConnected) {
@@ -135,6 +162,17 @@ function doDisconnect() {
     return;
   }
   vias.disconnect(disconnectCb, disconnectErrCb);
+}
+function doPromiseDisconnect() {
+   if (vias === undefined || !bConnected) {
+    showInMsgArea("WebSocket not connected");
+    return;
+  }
+  vias.disconnect().then(()=>{
+    disconnectCb();
+  }, (_err)=>{
+    disconnectErrCb(_err);
+  });
 }
 
 function doGetSpeed() {
@@ -152,6 +190,38 @@ function doGetSpeed() {
     function(_err) {
       showInMsgArea(`get speed:failure: err= ${_err.number}`);
     });
+}
+function doPromiseGetSpeed() {
+
+  if (!bConnected) {
+    console.log("WebSocket not connected");
+    return;
+  }
+  // promise type get method test
+  vias.get(VSS_SPEED).then((_val) => {
+    showInMsgArea(`Promise get speed:success: val= ${_val}`);
+  },(_err) => {
+    showInMsgArea(`Promise get speed:failure: err= ${_err.number}`);
+  });
+}
+function doMultiPromiseGet() {
+
+  if (!bConnected) {
+    console.log("WebSocket not connected");
+    return;
+  }
+  // promise type get method test
+  vias.get(VSS_SPEED).then((_val) => {
+    showInMsgArea(`Promise get speed:success: val= ${_val}`);
+    return vias.get(VSS_RPM);
+  }).then((_val) => {
+    showInMsgArea(`Promise get RPM:success: val= ${_val}`);
+    return vias.get(VSS_STEER);
+  }).then((_val) => {
+    showInMsgArea(`Promise get SteeringAngle:success: val= ${_val}`);
+  }).catch((_err) => {
+    showInMsgArea(`Error: ${_err.number}`);
+  });
 }
 
 function doSubscribe(_refval) {
@@ -211,6 +281,23 @@ function doUnsubscribeSpeed() {
   };
   doUnsubscribe(refval);
 }
+function doPromiseUnsubscribeSpeed() {
+  if (!bConnected) {
+    showInMsgArea("WebSocket not connected");
+    return;
+  }
+  if (subId_speed === null || subId_speed === undefined) {
+    showInMsgArea("Speed is not subscribed");
+    return;
+  }
+  vias.unsubscribe(subId_speed).then(()=>{
+    showInMsgArea('Promise unsubscribe:success');
+    subId_speed = null;
+  }, (_err)=>{
+    showInMsgArea(`Promise unsubscribe:failure err=${_err.number}`);
+  });
+}
+
 function doUnsubscribeRPM() {
   var refval = {};
   refval.subId = subId_RPM;
@@ -238,6 +325,17 @@ function doUnsubscribeAll() {
       showInMsgArea(`unsubscribeAll:failure err=${_err.number}`);
     }
   );
+}
+function doPromiseUnsubscribeAll() {
+  if (!bConnected) {
+    showInMsgArea("WebSocket not connected");
+    return;
+  }
+  vias.unsubscribeAll().then( ()=>{
+    showInMsgArea('Promise unsubscribeAll:success');
+  }, (_err)=> {
+    showInMsgArea(`Promise unsubscribeAll:failure err=${_err.number}`);
+  });
 }
 
 function doGetDoorlock() {
@@ -269,6 +367,19 @@ function doSetDoorlockTrue() {
       showInMsgArea(`set doorlock:failure: err= ${_err.number}`);
     });
 }
+function doPromiseSetDoorlockTrue() {
+  if (!bConnected) {
+    showInMsgArea("WebSocket not connected");
+    return;
+  }
+  // set method test
+  vias.set(VSS_DOORLOCK, 'true').then(()=>{
+    showInMsgArea(`Promise set doorlock:success`);
+  },(_err)=>{
+    showInMsgArea(`Promise set doorlock:failure: err= ${_err.number}`);
+  });
+}
+
 function doSetDoorlockFalse() {
   if (!bConnected) {
     showInMsgArea("WebSocket not connected");
@@ -301,6 +412,24 @@ function doAuthorize() {
       showInMsgArea(`authorize :failure: err= ${_err.number}`);
     });
 }
+function doPromiseAuthorize() {
+  if (!bConnected) {
+    showInMsgArea("WebSocket not connected");
+    return;
+  }
+  // get method test
+  var userToken = 'token_valid';    // fake token for test
+  var deviceToken = 'token_valid';  // fake token for test
+  var tokens = {"authorization"     : userToken,
+                "www-vehicle-device": deviceToken};
+  vias.authorize(tokens).then((_ttl)=>{
+    showInMsgArea(`Promise authorize :success: TTL= ${_ttl}`);
+  },(_err)=>{
+    showInMsgArea(`Promise authorize :failure: err= ${_err.number}`);
+
+  });
+}
+
 function doGetVss() {
   if (!bConnected) {
     showInMsgArea("WebSocket not connected");
@@ -316,6 +445,20 @@ function doGetVss() {
     function(_err) {
       showInMsgArea(`getVSS :failure: err= ${_err.number}`);
     });
+}
+function doPromiseGetVss() {
+  if (!bConnected) {
+    showInMsgArea("WebSocket not connected");
+    return;
+  }
+  // get method test
+  var path = 'Attribute.Body';
+  showInMsgArea('Promise getVSS: path=' + path);
+  vias.getVss(path).then(()=>{
+    showInMsgArea(`Promise getVSS :success: vss= ${_vss}`);
+  }, (_err)=>{
+    showInMsgArea(`Promise getVSS :failure: err= ${_err.number}`);
+  });
 }
 
 (function() {
@@ -338,6 +481,19 @@ function doGetVss() {
   document.getElementById('idBtnAuthorize').addEventListener('click', doAuthorize);
   document.getElementById('idBtnGetVss').addEventListener('click', doGetVss);
 
+  // == Promise test ==
+  document.getElementById('idBtnPromiseConnect').addEventListener('click', doPromiseConnect);
+  document.getElementById('idBtnPromiseDisconnect').addEventListener('click', doPromiseDisconnect);
+
+  document.getElementById('idBtnPromiseGetSpeed').addEventListener('click', doPromiseGetSpeed);
+  document.getElementById('idBtnMultiPromiseGet').addEventListener('click', doMultiPromiseGet);
+
+  document.getElementById('idBtnPromiseUnsubscribeSpeed').addEventListener('click', doPromiseUnsubscribeSpeed );
+  document.getElementById('idBtnPromiseUnsubscribeAll').addEventListener('click', doPromiseUnsubscribeAll );
+
+  document.getElementById('idBtnPromiseSetDoorlockTrue').addEventListener('click', doPromiseSetDoorlockTrue );
+  document.getElementById('idBtnPromiseAuthorize').addEventListener('click', doPromiseAuthorize );
+  document.getElementById('idBtnPromiseGetVss').addEventListener('click', doPromiseGetVss );
 })();
 
 </script>

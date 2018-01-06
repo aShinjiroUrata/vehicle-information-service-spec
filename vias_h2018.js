@@ -7,9 +7,12 @@
 // private property/method の実現方式のbest practiceが
 // 不明確のため、ES5の旧式のclass作成方式を使用した
 // private な property は特に作らない。当面は。
-// TODO: と思ったが、一般に使ってもらう lib とするには、
-// 余計なものを隠蔽することが必要
-
+//
+// TODO:
+// - 一般に使ってもらう lib とするため余計なものを隠蔽することが必要
+// - Promise対応
+// - debug log off/delete
+// - handling of Error object
 // ==============================
 
 // == Request Dictionary Class ==
@@ -127,14 +130,12 @@ var ReqDict = (function() {
     svrSubIdDict = {};
   };
   p.convertSvrSubIdToReqId = function(_subId) {
-    //TODOTODOTODO
     var reqId = svrSubIdDict[_subId];
     if (reqId == undefined || reqId == null)
       return null;
     return reqId;
   };
   p.convertReqIdToSvrSubId = function(_reqId) {
-    //TODOTODOTODO
     var reqObj = mainDict[_reqId];
     if (reqObj == undefined || reqObj == null)
       return null;
@@ -163,7 +164,6 @@ var ReqDict = (function() {
 // == VISClient Class   ==
 // == (= Core of VIAS ) ==
 // =======================
-//class VISClient {
 var VISClient = (function() {
 
   // ==================
@@ -205,6 +205,14 @@ var VISClient = (function() {
   var p = visClient.prototype;
 
   p.connect = function(_sucCb, _errCb) {
+    dbgLog("enter connect");
+    if (_sucCb == undefined)
+      return p.pconnect.call(this);
+    else
+      return p.cconnect.call(this, _sucCb, _errCb); //need to replace 'this'
+  };
+  p.cconnect = function(_sucCb, _errCb) {
+    dbgLog("enter cconnect");
     // TODO: connect の失敗ケースはどんな場合？
     if (connection != null) {
       //既にconnectionがあるので、エラーを返す
@@ -218,10 +226,11 @@ var VISClient = (function() {
     connection = new WebSocket(url, SUBPROTOCOL);
     // 成功したら _sucCbで通知(何を？
     //connection.onopen    = (_event) => {onWsOpen   (_event, _sucCb);};
+    //connection.onclose   = (_event) => {onWsClose  (_event, wsCloseCb);};
     // for h2018
     connection.onopen    = (_event) => {onWsOpen   (_event, this.roomId,  _sucCb);};
-    //connection.onclose   = (_event) =>       {onWsClose  (_event, wsCloseCb);};
     connection.onclose   = (_event) => {onWsClose  (_event);};
+
     connection.onmessage = (_event) => {onWsMessage(_event);}
 
     // TODO: ここでは、connect のerrCbを設定しているが、これでよい？
@@ -234,17 +243,46 @@ var VISClient = (function() {
     onConnectErrCb = _errCb;
 
   };
+  p.pconnect = function() {
+    dbgLog("enter pconnect");
+    var thiz = this;
+    return new Promise(function(_res, _rej) {
+      p.cconnect.call(thiz, _res, _rej);  // need to replace this
+    });
+  };
+
   p.disconnect = function(_sucCb, _errCb) {
+    dbgLog("enter disconnect");
+    if (_sucCb == undefined)
+      return p.pdisconnect();
+    else
+      return p.cdisconnect(_sucCb, _errCb);
+  };
+  p.cdisconnect = function(_sucCb, _errCb) {
     if (connection == null) {
       var err = createErrObj(-1, "connetion not exists","");  //TODO: 正しいエラーコードは？
       setTimeout(function(){_errCb(err);},1);
       return;
     }
-    //wsCloseCb = _sucCb; //onclose でコールバックを呼べるようにprivateメンバに設定しておく
     onDisconnectSucCb = _sucCb; //onclose でコールバックを呼べるようにprivateメンバに設定しておく
     connection.close();
   };
+  p.pdisconnect = function() {
+    dbgLog("enter pdisconnect");
+    return new Promise(function(_res, _rej) {
+      p.cdisconnect(_res, _rej);
+    });
+  };
+
   p.get = function(_path, _sucCb, _errCb) {
+    dbgLog("enter get");
+    if (_sucCb == undefined)
+      return p.pget(_path);
+    else
+      return p.cget(_path, _sucCb, _errCb);
+  };
+  p.cget = function(_path, _sucCb, _errCb) {
+    dbgLog("enter cget");
     dbgLog("get: path=" + _path);
     if (connection == null || connection.readyState != WS_OPEN) {
       // TODO: エラーを返す
@@ -267,6 +305,13 @@ var VISClient = (function() {
 
     dbgLog("--: ==> " + json_str);
   };
+  p.pget = function(_path) {
+    dbgLog("enter pget");
+    return new Promise(function(_res, _rej) {
+      p.cget(_path, _res, _rej);
+    });
+  };
+
   p.subscribe = function(_path, _sucCb, _errCb, _filter) {
     dbgLog("subscribe: path=" + _path);
     if (connection == null || connection.readyState != WS_OPEN) {
@@ -307,8 +352,16 @@ var VISClient = (function() {
     //      呼び出し元の success Callback で通知
 
   };
-  p.unsubscribe = function(_cliSubId, _sucCb, _errCb) {
 
+  p.unsubscribe = function(_cliSubId, _sucCb, _errCb) {
+    dbgLog("enter unsubscribe");
+    if (_sucCb == undefined)
+      return p.punsubscribe(_cliSubId);
+    else
+      return p.cunsubscribe(_cliSubId, _sucCb, _errCb);
+  };
+  p.cunsubscribe = function(_cliSubId, _sucCb, _errCb) {
+    dbgLog("enter cunsubscribe");
     dbgLog("unsubscribe: cliSubId=" + _cliSubId);
     if (connection == null || connection.readyState != WS_OPEN) {
       // TODO: エラーを返す
@@ -336,9 +389,22 @@ var VISClient = (function() {
     dbgLog("--: ==> " + json_str);
 
   };
+  p.punsubscribe = function(_cliSubId) {
+    dbgLog("enter punsubscribe");
+    return new Promise(function(_res, _rej) {
+      p.cunsubscribe(_cliSubId, _res, _rej);
+    });
+  };
+
   p.unsubscribeAll = function(_sucCb, _errCb) {
-    //TODO:surata: デバッガで追って確認のこと！
-    dbgLog("unsubscribeAll");
+    dbgLog("enter unsubscribeAll");
+    if (_sucCb == undefined)
+      return p.punsubscribeAll();
+    else
+      return p.cunsubscribeAll(_sucCb, _errCb);
+  };
+  p.cunsubscribeAll = function(_sucCb, _errCb) {
+    dbgLog("enter cunsubscribeAll");
     if (connection == null || connection.readyState != WS_OPEN) {
       // TODO: 正しいエラーを返す
       var err = createErrObj(-1, "connetion not exists","");  //TODO: 正しいエラーコードは？
@@ -358,8 +424,22 @@ var VISClient = (function() {
 
     dbgLog("--: ==> " + json_str);
   };
+  p.punsubscribeAll = function() {
+    dbgLog("enter punsubscribeAll");
+    return new Promise(function(_res, _rej) {
+      p.cunsubscribeAll(_res, _rej);
+    });
+  };
 
   p.authorize = function(_tokens, _sucCb, _errCb) {
+    dbgLog("enter authorize");
+    if (_sucCb == undefined)
+      return p.pauthorize(_tokens);
+    else
+      return p.cauthorize(_tokens, _sucCb, _errCb);
+  };
+  p.cauthorize = function(_tokens, _sucCb, _errCb) {
+    dbgLog("enter cauthorize");
     dbgLog("authorize: token=" + _tokens);
     if (connection == null || connection.readyState != WS_OPEN) {
       var err = createErrObj(-1, "connetion not ready","");
@@ -375,9 +455,23 @@ var VISClient = (function() {
     var json_str = JSON.stringify(req);
     connection.send(json_str);
     dbgLog("--: ==> " + json_str);
-
   };
+  p.pauthorize = function(_tokens) {
+    dbgLog("enter pauthorize");
+    return new Promise(function(_res, _rej) {
+      p.cauthorize(_tokens, _res, _rej);
+    });
+  };
+
   p.getVss = function(_path, _sucCb, _errCb) {
+    dbgLog("enter getVss");
+    if (_sucCb == undefined)
+      return p.pgetVss(_path);
+    else
+      return p.cgetVss(_path, _sucCb, _errCb);
+  };
+  p.cgetVss = function(_path, _sucCb, _errCb) {
+    dbgLog("enter cgetVss");
     dbgLog("getVSS: path=" + _path);
     if (connection == null || connection.readyState != WS_OPEN) {
       var err = createErrObj(-1, "connetion not ready","");
@@ -395,7 +489,22 @@ var VISClient = (function() {
     dbgLog("--: ==> " + json_str);
 
   };
+  p.pgetVss = function(_path) {
+    dbgLog("enter pgetVss");
+    return new Promise(function(_res, _rej) {
+      p.cgetVss(_path, _res, _rej);
+    });
+  };
+
   p.set = function(_path, _val, _sucCb, _errCb) {
+    dbgLog("enter set");
+    if (_sucCb == undefined)
+      return p.pset(_path, _val);
+    else
+      return p.cset(_path, _val, _sucCb, _errCb);
+  };
+  p.cset = function(_path, _val, _sucCb, _errCb) {
+    dbgLog("enter cset");
     dbgLog("set: path=" + _path + ", value=" + _val);
     if (connection == null || connection.readyState != WS_OPEN) {
       var err = createErrObj(-1, "connetion not ready","");
@@ -411,6 +520,12 @@ var VISClient = (function() {
     var json_str = JSON.stringify(req);
     connection.send(json_str);
     dbgLog("--: ==> " + json_str);
+  };
+  p.pset = function(_path, _val) {
+    dbgLog("enter pset");
+    return new Promise(function(_res, _rej) {
+      p.cset(_path, _val, _res, _rej);
+    });
   };
 
   // ====================
@@ -837,7 +952,7 @@ var VISClient = (function() {
     return err;
   }
   function dbgLog(_msg) {
-    console.log("[VIAS]:"+_msg);
+    //console.log("[VIAS]:"+_msg);
   }
 
   return visClient;
