@@ -24,6 +24,7 @@ var sockIoClient = require('socket.io-client');
 
 // == Server IP and Port Number ==
 var svr_config = require('./svr_config');
+// AWS上でVISSを使う場合、以下にはAWSのPrivIPを設定すると動作した。PubIPではNGだった。
 var VISS_IP = svr_config.VISS_IP_PRV;
 var VISS_PORT = svr_config.VISS_PORT;
 var SUBPROTOCOL = "wvss1.0";
@@ -82,7 +83,8 @@ function selectProtocols(protocols) {
   return SUBPROTOCOL;
 };
 
-// [ urata ] : clientからの接続を受けるWebSocketの生成
+// [ urata ] : VISS Server's WebSocket URL( wait with PrivIP )
+printLog(LOG_DEFAULT, "VISS WSSVR = ws://" + VISS_IP + ":" + VISS_PORT);
 var WebSocketServer = require('ws').Server;
 var vissvr = new WebSocketServer({
   host : VISS_IP,
@@ -262,6 +264,9 @@ if (dataSrc === EXT_MOCK_SERVER) {
 // == dataSrc connection: SIP project Hackathon Server ==
 // ======================================================
 // #use socket.io by requirement of Hackathon server
+printLog(LOG_DEFAULT, "EXT_SIPSVR_ROOMID = " + EXT_SIPSVR_ROOMID);
+printLog(LOG_DEFAULT, "EXT_SIPSVR_IP : EXT_SIPSVR_PORT = " + EXT_SIPSVR_IP + ":" + EXT_SIPSVR_PORT);
+
 var g_extSIPDataSrc = {
   roomID: EXT_SIPSVR_ROOMID,  // def in 'svr_config.js'
   svrUrl: "ws://" + EXT_SIPSVR_IP + ":" + EXT_SIPSVR_PORT,  //def in 'svr_config.js'
@@ -320,6 +325,7 @@ var g_extSIPDataSrc = {
   // TODO: sipDataSrc と mockDataSrcの使い分けはどうする？
   connectToDataSrc : function(_sessObj) {
     printLog(LOG_DEFAULT , "  :connectToDataSrc");
+    printLog(LOG_DEFAULT, "extSIPDataSrc.svrUrl = " + g_extSIPDataSrc.svrUrl);
     // connect to sipDataSrc
     var wsSipDataSrc = sockIoClient.connect(g_extSIPDataSrc.svrUrl);
     _sessObj.wsDataSrc = wsSipDataSrc;  //session Obj に dataSrc向けwsを保存
