@@ -89,7 +89,7 @@ var WebSocketServer = require('ws').Server;
 var vissvr = new WebSocketServer({
   host : VISS_IP,
   port : VISS_PORT,
-  handleProtocols : selectProtocols 
+  handleProtocols : selectProtocols
 });
 
 // =========================================
@@ -288,38 +288,101 @@ var g_extSIPDataSrc = {
 
   // SIP形式PathをVSS形式に置き換えるためのHash
   // ただし、SIP形式のPathと言っても、Zoneの部分を無理やりPathに入れ込む一時対応をしてある
+  // TODO: 本来はこういう部分は外部ファイルからのロードにしたい
   convertHash : {
     // == Vehicle Data ==
-    //lat
-    //lng
-    //alt
-    //head
-    //speed
-     'Vehicle.RunningStatus.VehicleSpeed.speed'    : 'Signal.Drivetrain.Transmission.Speed'
+     'Smartphone.Gps.LocationInf.latitude'        : 'Signal.Cabin.Infortainment.Navigation.Currentlocation.Latitude'    //lat
+    ,'Smartphone.Gps.LocationInf.longitude'       : 'Signal.Cabin.Infortainment.Navigation.Currentlocation.Longitude'   //lng
+    ,'Smartphone.Gps.LocationInf.altitude'        : 'Signal.Cabin.Infortainment.Navigation.Currentlocation.Altitude'    //alt
+    ,'Smartphone.Gps.LocationInf.heading'         : 'Signal.Cabin.Infortainment.Navigation.Currentlocation.Heading'     //head
+    ,'Smartphone.Gps.LocationInf.speed'           : 'Signal.Cabin.Infortainment.Navigation.Currentlocation.Speed'       //speed
+    ,'Vehicle.RunningStatus.VehicleSpeed.speed'   : 'Signal.Drivetrain.Transmission.Speed'
     ,'Vehicle.RunningStatus.EngineSpeed.speed'    : 'Signal.Drivetrain.InternalCombustionEngine.RPM'
     ,'Vehicle.RunningStatus.SteeringWheel.angle'  : 'Signal.Chassis.SteeringWheel.Angle'
-    ,'Vehicle.RunningStatus.AcceleratorPedalPosition.value'     :'Signal.Chassis.Accelerator.PedalPosition'  //AccelPedal
-    ,'Vehicle.RunningStatus.BrakeOperation.brakePedalDepressed' :'Signal.Chassis.Brake.PedalPosition'  //BrakePedal
-    ,'Vehicle.RunningStatus.ParkingBrake.status'  :'Signal.Chassis.ParkingBrake.IsEngaged'  //ParkingBrake
-    //Accel-x
-    //Accel-y
-    //Acdel-z
-    //Gyro-x
-    //Gyro-y
-    //Gyro-z
-    //Gear
-    ,'Vehicle.RunningStatus.Fuel.Level'                 :'Signal.Drivetrain.FuelSystem.Level'  //FuelLevel
-    ,'Vehicle.RunningStatus.Fuel.instantConsumption'    :'Signal.Drivetrain.FuelSystem.instantConsumption'  //instantFuelConsum
-    //,'Vehicle.RunningStatus.VehiclePowerModetype.value' :'??'  //VehiclePowerMode
-    ,'Vehicle.Maintainance.Odometer.distanceTotal'      :'Signal.OBD.DistanceWithMIL'  //distanceTotal
-    ,'Vehicle.DrivingSafety.Door.Front.Right.status'    :'Signal.Cabin.Door.Row1.Right.IsOpen'    //Door(f-r)     //Zone項目
-    ,'Vehicle.DrivingSafety.Door.Front.Left.status'     :'Signal.Cabin.Door.Row1.Left.IsOpen'     //Door(f-l)     //Zone項目
-    ,'Vehicle.DrivintSafety.Seat.Front.Right.seatbelt'  :'Signal.Cabin.Seat.Row1.Pos1.IsBelted'   //Seatbelt(f-r) //Zone項目
+    ,'Vehicle.RunningStatus.AcceleratorPedalPosition.value'     :'Signal.Chassis.Accelerator.PedalPosition' //AccelPedal
+    ,'Vehicle.RunningStatus.BrakeOperation.brakePedalDepressed' :'Signal.Chassis.Brake.PedalPosition'       //BrakePedal
+    ,'Vehicle.VisionAndParking.ParkingBrake.status'             :'Signal.Chassis.ParkingBrake.IsEngaged'    //ParkingBrake
+    ,'CarAdapter.SensorData.Acceleration.x'       : 'Signal.Vehicle.Acceleration.X'    //Accel-x
+    ,'CarAdapter.SensorData.Acceleration.y'       : 'Signal.Vehicle.Acceleration.Y'    //Accel-y
+    ,'CarAdapter.SensorData.Acceleration.z'       : 'Signal.Vehicle.Acceleration.Z'    //Acdel-z
+
+    ,'CarAdapter.SensorData.Gyro.x'               : 'Signal.Vehicle.Acceleration.Pitch'   //Gyro-x
+    ,'CarAdapter.SensorData.Gyro.y'               : 'Signal.Vehicle.Acceleration.Roll'    //Gyro-y
+    ,'CarAdapter.SensorData.Gyro.z'               : 'Signal.Vehicle.Acceleration.Yaw'     //Gyro-z
+
+    ,'Vehicle.RunningStatus.Transmission.mode'        :'Signal.Drivetrain.Transmission.Gear'              //Gear
+    ,'Vehicle.RunningStatus.Fuel.Level'               :'Signal.Drivetrain.FuelSystem.Level'               //FuelLevel
+    ,'Vehicle.RunningStatus.Fuel.instantConsumption'  :'Signal.Drivetrain.FuelSystem.instantConsumption'  //instantFuelConsum
+    //,'Vehicle.RunningStatus.VehiclePowerModetype.value' :'??'  //VehiclePowerMode e.g. 'running'
+    ,'Vehicle.Maintainance.Odometer.distanceTotal'    :'Signal.OBD.DistanceWithMIL'             //distanceTotal
+    ,'Vehicle.DrivingSafety.Door.Front.Right.status'  :'Signal.Cabin.Door.Row1.Right.IsOpen'    //Door(f-r)     //Zone項目
+    ,'Vehicle.DrivingSafety.Door.Front.Left.status'   :'Signal.Cabin.Door.Row1.Left.IsOpen'     //Door(f-l)     //Zone項目
+    ,'Vehicle.DrivintSafety.Seat.Front.Right.seatbelt':'Signal.Cabin.Seat.Row1.Pos1.IsBelted'   //Seatbelt(f-r) //Zone項目
+
+    //,'Vehicle.DrivingSafety.Seat.Front.Right.identificationType'    :''   //不使用
+    //,'Vehicle.DrivingSafety.Seat.Front.Right.occupantName'          :''
+    //,'Vehicle.DrivingSafety.Seat.Front.Right.occupant'              :''
+
     ,'Vehicle.RunningStatus.LightStatus.head'     :'Signal.Body.Light.IsLowBeamOn'  //HeadLight
+    ,'Vehicle.RunningStatus.LightStatus.highbeam' :'Signal.Body.Light.IsLowBeamOn'  //HeadLight
     ,'Vehicle.RunningStatus.LightStatus.brake'    :'Signal.Body.Light.IsBrakeOn'    //BrakeLight
     ,'Vehicle.RunningStatus.LightStatus.parking'  :'Signal.Body.Light.IsParkingOn'  //ParkingLight
-    // == Sensor Data ==
+
+    // == ika kisai more ? ==
+
+    //,'Vehicle.Climate.Temperature.interiorTemperature':''   //旧データに存在するが使用せず、h2018データ用項目とする
+    //,'Vehicle.RunningStatus.Acceleration.x'  //こちらはなんだったか？いずれにしても不使用
+    //,'Vehicle.RunningStatus.Acceleration.y'
+    //,'Vehicle.RunningStatus.Acceleration.z'
+    //,'Vehicle.RunningStatus.EngineCoolant.temperature'
+
+    // == Sensor 2017 ==
+    // = vital =
+    //,'Sensor.Vital.Data.beat'     // NoUse: heartrate
+    //,'Sensor.Vital.Data.cluster'  // NoUse: emotion
+    // = JINS MEME =
+    /*
+    'Sensor.Meme.Raw.eMvU'    // NoUse: eyeMoveUp
+    'Sensor.Meme.Raw.eMvD'    // NoUse: eyeMoveDown
+    'Sensor.Meme.Raw.eMvR'    // NoUse: eyeMoveRight
+    'Sensor.Meme.Raw.eMvL'    // NoUse: eyeMoveLeft
+    'Sensor.Meme.Raw.blkSp'    // NoUse: blinkSpeed
+    'Sensor.Meme.Raw.blkSt'    // NoUse: blinkStrength
+    'Sensor.Meme.Raw.pch'    // NoUse: pitch
+    'Sensor.Meme.Raw.rol'    // NoUse: roll
+    'Sensor.Meme.Raw.yaw'    // NoUse: yaw
+    'Sensor.Meme.Raw.acX'    // NoUse: accX
+    'Sensor.Meme.Raw.acY'    // NoUse: accY
+    'Sensor.Meme.Raw.acZ'    // NoUse: accZ
+    // NoUse: tilt
+    */
+
+    // == Sensor 2018 ==
     // TODO: 以下に追加していく
+    // = JINS
+    ,'Sensor.Meme.Proc.awk': 'Private.Signal.Driver.Awakeness'// driver awakeness
+    ,'Sensor.Meme.Proc.att': 'Private.Signal.Driver.Attentiveness'// driver attentiveness
+    ,'Sensor.Meme.Proc.awk_pas': 'Private.Signal.Passenger.Awakeness'// driver awakeness
+    ,'Sensor.Meme.Proc.att_pas': 'Private.Signal.Passenger.Attentiveness'// driver attentiveness
+    ,'Sensor.Meme.Proc.awk_bck': 'Private.Signal.Backseat.Awakeness'// driver awakeness
+    ,'Sensor.Meme.Proc.att_bck': 'Private.Signal.Backseat.Attentiveness'// driver attentiveness
+
+    // = iPhone/iWatch/Sdtech
+    ,'Sensor.Ios.Data.altitude': 'Private.Signal.Driver.Altitude' // Altitude of driver device
+    ,'Sensor.Ios.Data.atompressure': 'Signal.OBD.BarometricPressure'
+    // iwatch heartrate
+    ,'Sensor.Vital.Data.beat': 'Private.Signal.Driver.Heartrate'
+    // sdtech concentrate
+    ,'Sensor.Vital.Data.concent': 'Private.Signal.Driver.Concentration'
+
+    // = MESH
+    ,'Sensor.Mesh.Data.temperature': 'Signal.Cabin.HVAC.AmbientTemperture'
+    ,'Sensor.Mesh.Data.humidity': 'Signal.Cabin.HVAC.AmbientAirTemperature'
+    ,'Sensor.Mesh.Data.trunk': 'Signal.Body.Trunk.IsOpen'
+
+    // = Bocco
+    ,'Sensor.Bocco.Data.aircon': 'Signal.Cabin.HVAC.IsAirConditioningActive'
+    ,'Sensor.Bocco.Data.window': 'Signal.Cabin.Door.Row1.Right.Window.Position'
   },
 
   // TODO: sipDataSrc と mockDataSrcの使い分けはどうする？
@@ -432,6 +495,7 @@ var g_extSIPDataSrc = {
     var arryLen = sipArry.length;
     var vssHash = {};
     for (var i = 0; i < arryLen; i++) {
+      console.log("commingPath = " + sipArry[i].path);
       var vssPath = this.convertHash[sipArry[i].path];
       if (vssPath === undefined) continue;
       var item = {'path'      : vssPath,
@@ -953,7 +1017,7 @@ function dataReceiveHandler(_sessObj, _msg) {
 
           } else if (reqObj.action === "subscribe") {
             // send back 'subscribeSuccessResponse'
-            retObj = createSubscriptionNotificationJson(reqObj.subscriptionId, matchObj.value, 
+            retObj = createSubscriptionNotificationJson(reqObj.subscriptionId, matchObj.value,
                                                         matchObj.timestamp);
 
             if (_ws != null)
@@ -1205,7 +1269,7 @@ function createGetErrorResponse(reqId, error, timestamp) {
 }
 
 function createSubscribeSuccessResponse(action, reqId, subId, timestamp) {
-  var retObj = {"action":action, "requestId":reqId, "subscriptionId":subId, 
+  var retObj = {"action":action, "requestId":reqId, "subscriptionId":subId,
                 "timestamp":timestamp};
   return retObj;
 }
@@ -1237,7 +1301,7 @@ function createUnsubscribeErrorResponse(action, reqId, subId, error, timestamp) 
 }
 
 function createUnsubscribeAllSuccessResponse(action, reqId, timestamp) {
-  var retObj = {"action": action, "requestId":reqId, 
+  var retObj = {"action": action, "requestId":reqId,
                 "timestamp":timestamp};
   return retObj;
 }
