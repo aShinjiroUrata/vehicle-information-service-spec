@@ -360,25 +360,23 @@ var g_extSIPDataSrc = {
     // == Sensor 2018 ==
     // TODO: 以下に追加していく
     // = JINS
-    ,'Sensor.Meme.Proc.awk': 'Private.Signal.Driver.Awakeness'// driver awakeness
-    ,'Sensor.Meme.Proc.att': 'Private.Signal.Driver.Attentiveness'// driver attentiveness
-    ,'Sensor.Meme.Proc.awk_pas': 'Private.Signal.Passenger.Awakeness'// driver awakeness
-    ,'Sensor.Meme.Proc.att_pas': 'Private.Signal.Passenger.Attentiveness'// driver attentiveness
-    ,'Sensor.Meme.Proc.awk_bck': 'Private.Signal.Backseat.Awakeness'// driver awakeness
-    ,'Sensor.Meme.Proc.att_bck': 'Private.Signal.Backseat.Attentiveness'// driver attentiveness
+    ,'Sensor.Meme.Proc.awk':      'Private.Signal.Driver.Awakeness'// driver awakeness
+    ,'Sensor.Meme.Proc.att':      'Private.Signal.Driver.Attentiveness'// driver attentiveness
+    ,'Sensor.Meme.Proc.awk_pass': 'Private.Signal.Passenger.Awakeness'// driver awakeness
+    ,'Sensor.Meme.Proc.att_pass': 'Private.Signal.Passenger.Attentiveness'// driver attentiveness
+    ,'Sensor.Meme.Proc.awk_back': 'Private.Signal.Backseat.Awakeness'// driver awakeness
+    ,'Sensor.Meme.Proc.att_back': 'Private.Signal.Backseat.Attentiveness'// driver attentiveness
 
     // = iPhone/iWatch/Sdtech
-    ,'Sensor.Ios.Data.altitude': 'Private.Signal.Driver.Altitude' // Altitude of driver device
+    ,'Sensor.Ios.Data.altitude':     'Private.Signal.Driver.Altitude' // Altitude of driver device
     ,'Sensor.Ios.Data.atompressure': 'Signal.OBD.BarometricPressure'
-    // iwatch heartrate
-    ,'Sensor.Vital.Data.beat': 'Private.Signal.Driver.Heartrate'
-    // sdtech concentrate
-    ,'Sensor.Vital.Data.concent': 'Private.Signal.Driver.Concentration'
+    ,'Sensor.Vital.Data.beat':       'Private.Signal.Driver.Heartrate'
+    ,'Sensor.Vital.Data.concent':    'Private.Signal.Driver.Concentration'
 
     // = MESH
-    ,'Sensor.Mesh.Data.temperature': 'Signal.Cabin.HVAC.AmbientTemperture'
-    ,'Sensor.Mesh.Data.humidity': 'Signal.Cabin.HVAC.AmbientAirTemperature'
-    ,'Sensor.Mesh.Data.trunk': 'Signal.Body.Trunk.IsOpen'
+    ,'Sensor.Mesh.Data.temperature': 'Signal.Cabin.HVAC.AmbientAirTemperature'
+    ,'Sensor.Mesh.Data.humidity':    'Signal.Cabin.HVAC.AmbientAirHumidity'
+    ,'Sensor.Mesh.Data.trunk':       'Signal.Body.Trunk.IsOpen'
 
     // = Bocco
     ,'Sensor.Bocco.Data.aircon': 'Signal.Cabin.HVAC.IsAirConditioningActive'
@@ -495,7 +493,29 @@ var g_extSIPDataSrc = {
     var arryLen = sipArry.length;
     var vssHash = {};
     for (var i = 0; i < arryLen; i++) {
-      console.log("commingPath = " + sipArry[i].path);
+      //URATA DEBUG
+      /*
+      //console.log("commingPath = " + sipArry[i].path);
+      if (
+          sipArry[i].path == 'Sensor.Vital.Data.beat'
+          || sipArry[i].path == 'Sensor.Vital.Data.concent'
+          || sipArry[i].path == 'Sensor.Meme.Proc.awk'
+          || sipArry[i].path == 'Sensor.Meme.Proc.att'
+          || sipArry[i].path == 'Sensor.Meme.Proc.awk_pass'
+          || sipArry[i].path == 'Sensor.Meme.Proc.att_pass'
+          || sipArry[i].path == 'Sensor.Meme.Proc.awk_back'
+          || sipArry[i].path == 'Sensor.Meme.Proc.att_back'
+          || sipArry[i].path == 'Sensor.Ios.Data.atompressure'
+          || sipArry[i].path == 'Sensor.Ios.Data.altitude'
+          || sipArry[i].path == 'Sensor.Mesh.Data.temperature'
+          || sipArry[i].path == 'Sensor.Mesh.Data.humidity'
+        )
+      {
+        console.log("commingPath = " + sipArry[i].path);
+        console.log("vssPath = " + this.convertHash[sipArry[i].path]);
+        console.log("value = " + sipArry[i].value);
+      }
+      */
       var vssPath = this.convertHash[sipArry[i].path];
       if (vssPath === undefined) continue;
       var item = {'path'      : vssPath,
@@ -506,7 +526,7 @@ var g_extSIPDataSrc = {
     }
 
     var len = Object.keys(vssHash).length;
-    if (len > 1) {
+    if (len > 0) {
       var obj = {'action':'data', "data": vssHash};
       var vssStr = JSON.stringify(obj);
       return vssStr;
@@ -817,7 +837,6 @@ vissvr.on('connection', function(_wsCli) {
       var path = obj.path;
       var action = obj.action;
       var subId = getUniqueSubId();
-
       var ret = _reqTable.addReqToTable(obj, subId, null);
       var timestamp = new Date().getTime().toString(10);
       if (ret == false) {
@@ -1075,7 +1094,6 @@ function matchPathJson_SIPDataSrc(_reqObj, _dataHash) {
   // sipDataSrcの場合、dataObjがHashになっているので、ループで照合は不要になった
   if (_dataHash[reqPath] !== undefined) {
     obj = _dataHash[reqPath];
-    console.log('matchPathJson_Hash: matched!!: obj = ' + JSON.stringify(obj));
     return obj;
   }
 }
@@ -1155,6 +1173,15 @@ function printLog(lvl, msg) {
   if (lvl <= LOG_CUR_LEVEL) {
     console.log(getTimeString() + ":" + msg);
   }
+}
+
+// Verify validity of specified data path
+function isDataPathValid(_path) {
+  //これは、hackaton2018用のパスチェック
+  // TODO:
+  // 長さゼロ、undefined、nullならすぐに false を返す
+  // 事前にパスのリストを作っておき、照らし合わせる。
+  return true;
 }
 
 // ==================
