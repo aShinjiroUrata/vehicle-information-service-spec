@@ -36,7 +36,7 @@ var ReqDict = (function() {
 
     dbgLog("addRequest: reqId="+ _reqId);
     if (mainDict[_reqId] != undefined) {
-      this.dgbLog("--:Error: requestId already used. reqId="+ _reqId);
+      dbgLog("--:Error: requestId already used. reqId="+ _reqId);
       return false;
     }
     mainDict[_reqId] = _obj;
@@ -82,7 +82,7 @@ var ReqDict = (function() {
       return false;
     }
     if (cliSubIdDict[_cliSubId] != undefined) {
-      dbgLog("--:Error: this subscriptionId already used. subId="+_svrSubId);
+      dbgLog("--:Error: this subscriptionId already used. subId="+_cliSubId);
       return false;
     }
     cliSubIdDict[_cliSubId] = _reqId; // for cross reference.
@@ -804,7 +804,7 @@ var VISClient = (function() {
     // This is getSuccessResponse if ...
     // must exist    : action, requestId, value, timestamp
     // must not exist: error
-    if (msg.action === "get" && msg.requestId != undefined && 
+    if (msg.action === "get" && msg.requestId != undefined &&
         msg.value  != undefined && msg.timestamp != undefined &&
         msg.error == undefined)
       return true;
@@ -815,8 +815,8 @@ var VISClient = (function() {
     // This is getErrorResponse if ...
     // must exist    : action, requestId, error, timestamp
     // must not exist: value
-    if (msg.action === 'get' && msg.requestId != undefined && 
-        msg.error != undefined && msg.timestamp != undefined && 
+    if (msg.action === 'get' && msg.requestId != undefined &&
+        msg.error != undefined && msg.timestamp != undefined &&
         msg.value == undefined)
       return true;
     else
@@ -860,7 +860,7 @@ var VISClient = (function() {
     // This is subscribeErrorResponse if ...
     // must exist    : (path), requestId, error,(timestamp)
     // must not exist: (action), subscriptionId, value
-    if (msg.path != undefined && msg.requestId != undefined && msg.error != undefined && 
+    if (msg.path != undefined && msg.requestId != undefined && msg.error != undefined &&
         msg.action == undefined && msg.subscriptionId == undefined && msg.value == undefined)
       return true;
     else
