@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title> Full data test(Simple) </title>
+<style type="text/css">
+div#left {
+  float: left;
+  width: 400px;
+  border: solid 1px black;
+}
+div#right {
+  float: left;
+  width: 400px;
+  border: solid 1px black;
+}
+</style>
+</head>
+<body>
+
+<div id="full">
+  <div id="left">
+<h3>Vehicle Data</h3>
+<div> >> <span id="GPS_LATITUDE"> </span></div>
+<div> >> <span id="GPS_LONGITUDE"> </span></div>
+<div> >> <span id="GPS_ALTITUDE"> </span></div>
+<div> >> <span id="GPS_HEADING"> </span></div>
+<div> >> <span id="GPS_SPEED"> </span></div>
+<div> >> <span id="VEHICLE_SPEED"> </span></div>
+<div> >> <span id="ENGINE_SPEED"> </span></div>
+<div> >> <span id="STEER_ANGLE"> </span></div>
+<div> >> <span id="ACCEL_PEDAL"> </span></div>
+<div> >> <span id="BRAKE_PEDAL"> </span></div>
+<div> >> <span id="PARKINGBRAKE"> </span></div>
+<div> >> <span id="ACCEL_X"> </span></div>
+<div> >> <span id="ACCEL_Y"> </span></div>
+<div> >> <span id="ACCEL_Z"> </span></div>
+
+<div> >> <span id="GYRO_X"> </span></div>
+<div> >> <span id="GYRO_Y"> </span></div>
+<div> >> <span id="GYRO_Z"> </span></div>
+
+<div> >> <span id="GEAR"> </span></div>
+<div> >> <span id="FUEL_LEVEL"> </span></div>
+<div> >> <span id="FUEL_COMSUM"> </span></div>
+<div> >> Power Mode <span id="POWER_MODE"> </span></div>
+<div> >> <span id="DISTANCE_TOTAL"> </span></div>
+<div> >> <span id="DOOR_FR"> </span></div>
+<div> >> <span id="DOOR_FL"> </span></div>
+<div> >> <span id="BELT_FR"> </span></div>
+
+<div> >> <span id="LIGHT_LOWBEAM"> </span></div>
+<div> >> <span id="LIGHT_HIGHBEAM"> </span></div>
+<div> >> <span id="LIGHT_BRAKE"> </span></div>
+<div> >> <span id="LIGHT_PARKING"> </span></div>
+  </div> <!-- left -->
+  <div id="right">
+<h3>Sensor Data</h3>
+<h4>JINS Meme</h4>
+<div> >> <span id="DRV_AWAKENESS"> </span></div>
+<div> >> <span id="DRV_ATTENTIVENESS"> </span></div>
+<div> >> <span id="PAS_AWAKENESS"> </span></div>
+<div> >> <span id="PAS_ATTENTIVENESS"> </span></div>
+<div> >> <span id="BCK_AWAKENESS"> </span></div>
+<div> >> <span id="BCK_ATTENTIVENESS"> </span></div>
+<h4>iPhone/iWatch/Sdtech</h4>
+<div> >> <span id="HEARTRATE"> </span></div>
+<div> >> <span id="CONCENTRATION"> </span></div>
+<div> >> <span id="IP_ALTITUDE"> </span></div>
+<div> >> <span id="IP_ATOMPRESSURE"> </span></div>
+<h4>MESH</h4>
+<div> >> <span id="MESH_TEMPERATURE"> </span></div>
+<div> >> <span id="MESH_HUMIDITY"> </span></div>
+<div> >> <span id="MESH_TRUNK"> </span></div>
+<h4>BOCCO</h4>
+<div> >> <span id="BOCCO_AIRCON"> </span></div>
+<div> >> <span id="BOCCO_WINDOW"> </span></div>
+  </div> <!-- right -->
+</div> <!-- full -->
+
+</body>
+<!-- 設定 -->
+<script src="vias_h2018.js"></script>
+<script>
+
+/*
+// data from CarTomo
+-GPS_LATITUDE-
+-GPS_LONGITUDE-
+-GPS_ALTITUDE-
+-GPS_HEADING-
+-GPS_SPEED-
+-VEHICLE_SPEED-
+-ENGINE_SPEED-
+-STEER_ANGLE-
+-ACCEL_PEDAL-
+-BRAKE_PEDAL-
+-PARKINGBRAKE-
+-ACCEL_X-
+-ACCEL_Y-
+-ACCEL_Z-
+
+-GYRO_X-
+-GYRO_Y-
+-GYRO_Z-
+
+-GEAR-
+-FUEL_LEVEL -
+-FUEL_COMSUM-
+-POWER_MODE-
+-DISTANCE_TOTAL-
+-DOOR_FR-
+-DOOR_FL-
+-BELT_FR-
+
+-LIGHT_LOWBEAM -
+-LIGHT_HIGHBEAM-
+-LIGHT_BRAKE-
+-LIGHT_PARKING-
+
+-DRV_AWAKENESS-
+-DRV_ATTENTIVENESS-
+-PAS_AWAKENESS-
+-PAS_ATTENTIVENESS-
+-BCK_AWAKENESS-
+-BCK_ATTENTIVENESS-
+-HEARTRATE-
+-CONCENTRATION-
+-IP_ALTITUDE-
+-IP_ATOMPRESSURE-
+-MESH_TEMPERATURE-
+-MESH_HUMIDITY-
+-MESH_TRUNK-
+-BOCCO_AIRCON-
+-BOCCO_WINDOW-
+*/
+
+// === Vehicle Data Path
+const GPS_LATITUDE  = 'Signal.Cabin.Infortainment.Navigation.Currentlocation.Latitude';
+const GPS_LONGITUDE = 'Signal.Cabin.Infortainment.Navigation.Currentlocation.Longitude';   //lng
+const GPS_ALTITUDE  = 'Signal.Cabin.Infortainment.Navigation.Currentlocation.Altitude';    //alt
+const GPS_HEADING   = 'Signal.Cabin.Infortainment.Navigation.Currentlocation.Heading';     //head
+const GPS_SPEED     = 'Signal.Cabin.Infortainment.Navigation.Currentlocation.Speed';       //speed
+
+const VEHICLE_SPEED = 'Signal.Drivetrain.Transmission.Speed';
+const ENGINE_SPEED  = 'Signal.Drivetrain.InternalCombustionEngine.RPM';
+const STEER_ANGLE   = 'Signal.Chassis.SteeringWheel.Angle';
+const ACCEL_PEDAL   = 'Signal.Chassis.Accelerator.PedalPosition'; //AccelPedal
+const BRAKE_PEDAL   = 'Signal.Chassis.Brake.PedalPosition';       //BrakePedal
+const PARKINGBRAKE  = 'Signal.Chassis.ParkingBrake.IsEngaged';    //ParkingBrake
+const ACCEL_X = 'Signal.Vehicle.Acceleration.X';    //Accel-x
+const ACCEL_Y = 'Signal.Vehicle.Acceleration.Y';    //Accel-y
+const ACCEL_Z = 'Signal.Vehicle.Acceleration.Z';    //Acdel-z
+
+const GYRO_X = 'Signal.Vehicle.Acceleration.Pitch';   //Gyro-x
+const GYRO_Y = 'Signal.Vehicle.Acceleration.Roll';    //Gyro-y
+const GYRO_Z = 'Signal.Vehicle.Acceleration.Yaw';     //Gyro-z
+
+const GEAR = 'Signal.Drivetrain.Transmission.Gear';              //Gear
+const FUEL_LEVEL  = 'Signal.Drivetrain.FuelSystem.Level';               //FuelLevel
+const FUEL_COMSUM = 'Signal.Drivetrain.FuelSystem.instantConsumption';  //instantFuelConsum
+const DISTANCE_TOTAL = 'Signal.OBD.DistanceWithMIL';             //distanceTotal
+const DOOR_FR   = 'Signal.Cabin.Door.Row1.Right.IsOpen';    //Door(f-r)     //Zone項目
+const DOOR_FL = 'Signal.Cabin.Door.Row1.Left.IsOpen';     //Door(f-l)     //Zone項目
+const BELT_FR = 'Signal.Cabin.Seat.Row1.Pos1.IsBelted';   //Seatbelt(f-r) //Zone項目
+
+const LIGHT_LOWBEAM  = 'Signal.Body.Light.IsLowBeamOn';  //HeadLight
+const LIGHT_HIGHBEAM = 'Signal.Body.Light.IsLowBeamOn';  //HeadLight
+const LIGHT_BRAKE    = 'Signal.Body.Light.IsBrakeOn';    //BrakeLight
+const LIGHT_PARKING  = 'Signal.Body.Light.IsParkingOn';  //ParkingLight
+
+// === Sensor Data Path
+const DRV_AWAKENESS     = 'Private.Signal.Driver.Awakeness';
+const DRV_ATTENTIVENESS = 'Private.Signal.Driver.Attentiveness';
+const PAS_AWAKENESS     = 'Private.Signal.Passenger.Awakeness';
+const PAS_ATTENTIVENESS = 'Private.Signal.Passenger.Attentiveness';
+const BCK_AWAKENESS     = 'Private.Signal.Backseat.Awakeness';
+const BCK_ATTENTIVENESS = 'Private.Signal.Backseat.Attentiveness';
+
+// === iPhone/iWatch/Sdtech
+const HEARTRATE       = 'Private.Signal.Driver.Heartrate';
+const CONCENTRATION   = 'Private.Signal.Driver.Concentration';
+const IP_ALTITUDE     = 'Private.Signal.Driver.Altitude' // Altitude of driver device
+const IP_ATOMPRESSURE = 'Signal.OBD.BarometricPressure'
+
+// === MESH
+const MESH_TEMPERATURE = 'Signal.Cabin.HVAC.AmbientAirTemperature';
+const MESH_HUMIDITY    = 'Signal.Cabin.HVAC.AmbientAirHumidity';
+const MESH_TRUNK       = 'Signal.Body.Trunk.IsOpen';
+
+// === Bocco
+const BOCCO_AIRCON = 'Signal.Cabin.HVAC.IsAirConditioningActive';
+const BOCCO_WINDOW = 'Signal.Cabin.Door.Row1.Right.Window.Position';
+
+//var VISS_IP = '52.91.85.165';
+var VISS_IP = '10.5.162.71';
+var VISS_PORT='3001';
+var ROOM_ID = 'urata';
+const viscOption = {
+  'host': VISS_IP
+  ,'protocol': 'ws://'
+  ,'port': VISS_PORT
+  ,'roomId': ROOM_ID
+};
+<!-- 設定ここまで -->
+
+// == Subscribe sample ==
+// Subscribeはcallback方式
+var vias = new VISClient( viscOption );
+console.log("Try to connect to VISServer");
+vias.connect(() => {
+  console.log("Connected");
+
+  // === subscribe ===
+  // == Vehicle
+  //subscribe_ID("VEHICLE_SPEED");
+
+  subscribe_ID("GPS_LATITUDE");
+  subscribe_ID("GPS_LONGITUDE");
+  subscribe_ID("GPS_ALTITUDE");
+  subscribe_ID("GPS_HEADING");
+  subscribe_ID("GPS_SPEED");
+  subscribe_ID("ENGINE_SPEED");
+  subscribe_ID("STEER_ANGLE");
+  subscribe_ID("ACCEL_PEDAL");
+  subscribe_ID("BRAKE_PEDAL");
+  subscribe_ID("PARKINGBRAKE");
+  subscribe_ID("ACCEL_X");
+  subscribe_ID("ACCEL_Y");
+  subscribe_ID("ACCEL_Z");
+
+  subscribe_ID("GYRO_X");
+  subscribe_ID("GYRO_Y");
+  subscribe_ID("GYRO_Z");
+
+  subscribe_ID("GEAR");
+  subscribe_ID("FUEL_LEVEL");
+  subscribe_ID("FUEL_COMSUM");
+//  subscribe_ID("POWER_MODE");
+  subscribe_ID("DISTANCE_TOTAL");
+  subscribe_ID("DOOR_FR");
+  subscribe_ID("DOOR_FL");
+  subscribe_ID("BELT_FR");
+
+  subscribe_ID("LIGHT_LOWBEAM");
+  subscribe_ID("LIGHT_HIGHBEAM");
+  subscribe_ID("LIGHT_BRAKE");
+  subscribe_ID("LIGHT_PARKING");
+
+  // == Sensor
+  subscribe_ID("DRV_AWAKENESS");
+  subscribe_ID("DRV_ATTENTIVENESS");
+  subscribe_ID("PAS_AWAKENESS");
+  subscribe_ID("PAS_ATTENTIVENESS");
+  subscribe_ID("BCK_AWAKENESS");
+  subscribe_ID("BCK_ATTENTIVENESS");
+
+  subscribe_ID("HEARTRATE");
+  subscribe_ID("CONCENTRATION");
+  subscribe_ID("IP_ALTITUDE");
+  subscribe_ID("IP_ATOMPRESSURE");
+
+  subscribe_ID("MESH_TEMPERATURE");
+  subscribe_ID("MESH_HUMIDITY");
+  subscribe_ID("MESH_TRUNK");
+
+  subscribe_ID("BOCCO_AIRCON");
+  subscribe_ID("BOCCO_WINDOW");
+
+});
+
+// === Subscribe
+function subscribe_ID(_strID) {
+  //dispValById(_strID, '');
+  let varID = eval(_strID)
+  vias.subscribe(varID,
+    (_val)=>{dispValById(_strID, _val);})
+}
+// === Util
+function dispValById(_strID, _val) {
+  try {
+  //let varID = eval(_strID);
+  document.getElementById(_strID).innerHTML = _strID + " = " + _val;
+  }
+  catch(exp) {
+    console.log(exp);
+  }
+}
+</script>
+</html>
