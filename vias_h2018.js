@@ -215,6 +215,12 @@ var VISClient = (function() {
   };
   p.cconnect = function(_sucCb, _errCb) {
     dbgLog("enter cconnect");
+    if (_sucCb == undefined)
+      _subCb = function() {/*Do Nothing*/};
+
+    if (_errCb == undefined)
+      _errCb = function() {/*Do Nothing*/};
+
     // TODO: connect の失敗ケースはどんな場合？
     if (connection != null) {
       //既にconnectionがあるので、エラーを返す
