@@ -1038,9 +1038,16 @@ function dataReceiveHandler(_sessObj, _msg) {
             // send back 'subscribeSuccessResponse'
             retObj = createSubscriptionNotificationJson(reqObj.subscriptionId, matchObj.value,
                                                         matchObj.timestamp);
-
             if (_ws != null)
-              _ws.send(JSON.stringify(retObj));
+            {
+            //  _ws.send(JSON.stringify(retObj));
+              try {
+                _ws.send(JSON.stringify(retObj));
+              } catch(e) {
+                // Looks this can happen by timing, when client side disconnected.
+                console.log("Websocket send message to client error. Continue.");
+              }
+            }
           } else {
             // nothing to do
           }
