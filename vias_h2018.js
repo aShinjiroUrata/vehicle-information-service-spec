@@ -64,12 +64,14 @@ var ReqDict = (function() {
     return true;
   };
   p.getRequestByReqId = function(_reqId) {
-    if (mainDict[_reqId] == undefined) return false;
+    //if (mainDict[_reqId] == undefined) return false;
+    if (mainDict[_reqId] == undefined) return undefined;
     return mainDict[_reqId];
   };
   p.getRequestBySvrSubId = function(_svrSubId) {
     var reqId = svrSubIdDict[_svrSubId];
-    if (reqId == undefined) return false;
+    //if (reqId == undefined) return false;
+    if (reqId == undefined) return undefined;
     return this.getRequestByReqId(reqId);
   };
   p.addCliSubId = function(_reqId, _cliSubId) {
@@ -645,9 +647,28 @@ var VISClient = (function() {
       svrSubId = msg.subscriptionId;
       reqDictItem = g_reqDict.getRequestBySvrSubId(svrSubId);
     }
+    if (reqDictItem === null || reqDictItem === undefined) {
+      dbgLog("No reqId nor subId. Do nothing.");
+      return;
+    }
     reqObj = reqDictItem.reqObj;
-    sucCb = reqDictItem.sucCb;
-    errCb = reqDictItem.errCb;
+    if (reqObj === null || reqObj === undefined) {
+      // Basically, reqObj must exist.
+      dbgLog("No reqId nor subId. Do nothing.");
+      return;
+    }
+    if (reqDictItem.sucCb !== undefined) {
+      sucCb = reqDictItem.sucCb;
+    } else {
+      // Basically, subCb always exist.
+      sucCb = function() {/*do nothing*/};
+    }
+    if (reqDictItem.errCb !== undefined) {
+      errCb = reqDictItem.errCb;
+    } else {
+      // Sometimes errCb is not specified.
+      errCb = function() {/*do nothing*/};
+    }
 
     if (reqObj)
       action = reqObj.action;
