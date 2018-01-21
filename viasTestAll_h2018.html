@@ -83,58 +83,6 @@ div#right {
 <script src="vias_h2018.js"></script>
 <script>
 
-/*
-// data from CarTomo
--GPS_LATITUDE-
--GPS_LONGITUDE-
--GPS_ALTITUDE-
--GPS_HEADING-
--GPS_SPEED-
--VEHICLE_SPEED-
--ENGINE_SPEED-
--STEER_ANGLE-
--ACCEL_PEDAL-
--BRAKE_PEDAL-
--PARKINGBRAKE-
--ACCEL_X-
--ACCEL_Y-
--ACCEL_Z-
-
--GYRO_X-
--GYRO_Y-
--GYRO_Z-
-
--GEAR-
--FUEL_LEVEL -
--FUEL_COMSUM-
--POWER_MODE-
--DISTANCE_TOTAL-
--DOOR_FR-
--DOOR_FL-
--BELT_FR-
-
--LIGHT_LOWBEAM -
--LIGHT_HIGHBEAM-
--LIGHT_BRAKE-
--LIGHT_PARKING-
-
--DRV_AWAKENESS-
--DRV_ATTENTIVENESS-
--PAS_AWAKENESS-
--PAS_ATTENTIVENESS-
--BCK_AWAKENESS-
--BCK_ATTENTIVENESS-
--HEARTRATE-
--CONCENTRATION-
--IP_ALTITUDE-
--IP_ATOMPRESSURE-
--MESH_TEMPERATURE-
--MESH_HUMIDITY-
--MESH_TRUNK-
--BOCCO_AIRCON-
--BOCCO_WINDOW-
-*/
-
 // === Vehicle Data Path
 const GPS_LATITUDE  = 'Signal.Cabin.Infortainment.Navigation.Currentlocation.Latitude';
 const GPS_LONGITUDE = 'Signal.Cabin.Infortainment.Navigation.Currentlocation.Longitude';   //lng
@@ -213,7 +161,7 @@ vias.connect(() => {
 
   // === subscribe ===
   // == Vehicle
-  //subscribe_ID("VEHICLE_SPEED");
+  subscribe_ID("VEHICLE_SPEED");
 
   subscribe_ID("GPS_LATITUDE");
   subscribe_ID("GPS_LONGITUDE");
@@ -266,7 +214,6 @@ vias.connect(() => {
 
   subscribe_ID("BOCCO_AIRCON");
   subscribe_ID("BOCCO_WINDOW");
-
 });
 
 // === Subscribe
