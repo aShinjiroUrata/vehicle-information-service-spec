@@ -87,6 +87,8 @@ roomID: <input type='text' id='roomid' value='urata'></input>
 <script>
 
 // === Vehicle Data Path
+const VEHICLE_NULL = null;
+
 const GPS_LATITUDE  = 'Signal.Cabin.Infortainment.Navigation.Currentlocation.Latitude';
 const GPS_LONGITUDE = 'Signal.Cabin.Infortainment.Navigation.Currentlocation.Longitude';   //lng
 const GPS_ALTITUDE  = 'Signal.Cabin.Infortainment.Navigation.Currentlocation.Altitude';    //alt
@@ -143,7 +145,8 @@ const MESH_TRUNK       = 'Signal.Body.Trunk.IsOpen';
 const BOCCO_AIRCON = 'Signal.Cabin.HVAC.IsAirConditioningActive';
 const BOCCO_WINDOW = 'Signal.Cabin.Door.Row1.Right.Window.Position';
 
-var VISS_IP = '52.91.85.165';
+//var VISS_IP = '52.91.85.165';
+var VISS_IP = '10.5.162.71';
 var VISS_PORT='3001';
 const viscOption = {
   'host': VISS_IP
@@ -165,6 +168,7 @@ function connectCb() {
 
   // === subscribe ===
   // == Vehicle
+  subscribe_ID("VEHICLE_NULL");
   subscribe_ID("VEHICLE_SPEED");
 
   subscribe_ID("GPS_LATITUDE");
@@ -218,6 +222,7 @@ function connectCb() {
 
   subscribe_ID("BOCCO_AIRCON");
   subscribe_ID("BOCCO_WINDOW");
+
 }
 function connectErrCb() {
   bConnected = false;

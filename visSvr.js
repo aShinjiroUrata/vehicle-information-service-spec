@@ -17,7 +17,8 @@
 //  - データ項目の形式について
 //    - SIP形式: SIP Prj/ハッカソン向けに作成した車両データ形式
 //    - VSS形式: W3C Autotive WGで採用された、GeNIVI Vehicle Signal Specで定義された車両データ形式
-//
+//  - Errorメッセージの返し方を整理する
+//  - hackathon2018用に、get, subscribeの引数チェックを追加した。他のメソッドにも追加すべき。
 "use strict"
 
 var sockIoClient = require('socket.io-client');
@@ -83,7 +84,7 @@ function selectProtocols(protocols) {
   return SUBPROTOCOL;
 };
 
-// [ urata ] : VISS Server's WebSocket URL( wait with PrivIP )
+// VISS Server's WebSocket URL( wait with PrivIP )
 printLog(LOG_DEFAULT, "VISS WSSVR = ws://" + VISS_IP + ":" + VISS_PORT);
 var WebSocketServer = require('ws').Server;
 var vissvr = new WebSocketServer({
@@ -289,6 +290,7 @@ var g_extSIPDataSrc = {
   // SIP形式PathをVSS形式に置き換えるためのHash
   // ただし、SIP形式のPathと言っても、Zoneの部分を無理やりPathに入れ込む一時対応をしてある
   // TODO: 本来はこういう部分は外部ファイルからのロードにしたい
+  /*
   convertHash : {
     // == Vehicle Data ==
      'Smartphone.Gps.LocationInf.latitude'        : 'Signal.Cabin.Infortainment.Navigation.Currentlocation.Latitude'    //lat
@@ -341,7 +343,7 @@ var g_extSIPDataSrc = {
     //,'Sensor.Vital.Data.beat'     // NoUse: heartrate
     //,'Sensor.Vital.Data.cluster'  // NoUse: emotion
     // = JINS MEME =
-    /*
+    /-*
     'Sensor.Meme.Raw.eMvU'    // NoUse: eyeMoveUp
     'Sensor.Meme.Raw.eMvD'    // NoUse: eyeMoveDown
     'Sensor.Meme.Raw.eMvR'    // NoUse: eyeMoveRight
@@ -355,7 +357,7 @@ var g_extSIPDataSrc = {
     'Sensor.Meme.Raw.acY'    // NoUse: accY
     'Sensor.Meme.Raw.acZ'    // NoUse: accZ
     // NoUse: tilt
-    */
+    *-/
 
     // == Sensor 2018 ==
     // TODO: 以下に追加していく
@@ -382,7 +384,7 @@ var g_extSIPDataSrc = {
     ,'Sensor.Bocco.Data.aircon': 'Signal.Cabin.HVAC.IsAirConditioningActive'
     ,'Sensor.Bocco.Data.window': 'Signal.Cabin.Door.Row1.Right.Window.Position'
   },
-
+  */
   // TODO: sipDataSrc と mockDataSrcの使い分けはどうする？
   connectToDataSrc : function(_sessObj) {
     printLog(LOG_DEFAULT , "  :connectToDataSrc");
@@ -516,7 +518,9 @@ var g_extSIPDataSrc = {
         console.log("value = " + sipArry[i].value);
       }
       */
-      var vssPath = this.convertHash[sipArry[i].path];
+      //URATA working!
+      //var vssPath = this.convertHash[sipArry[i].path];
+      var vssPath = g_SIP_VSS_Hash[sipArry[i].path];
       if (vssPath === undefined) continue;
       var item = {'path'      : vssPath,
                   'value'     : sipArry[i].value,
@@ -681,7 +685,7 @@ AuthHash.prototype.ungrantAll = function() {
   printLog(LOG_DEFAULT,"  :AuthHash=" + JSON.stringify(this.hash));
 }
 
-// [ urata ] : clientからのconnect受付部分
+// clientからのconnect受付部分
 // - clientが接続に来たときに、dataSrcへの接続が失敗した場合は
 //   sessionの情報は残す？=> 残さない。clientには接続失敗と通知、
 //   その場合、vissvrとのconnectionは、disconenct状態にする
@@ -731,7 +735,7 @@ vissvr.on('connection', function(_wsCli) {
     // NOTE: assuming 1 message contains only 1 method.
     // for 'get'
 
-    // urata: added for h2018
+    // added for h2018
     if (obj.action === 'joinRoom'
         // if receive 'joinRoom' after already joined, ignore it.
         && _sessObj.joined === false) {
@@ -742,6 +746,7 @@ vissvr.on('connection', function(_wsCli) {
       var msg = JSON.stringify({"roomID": rmId, "data":"NOT REQUIRED"});
 
       // sipDataSrc に roomIdを通知してjoinRoom
+      // このあたり、dataSrc==EXTSIPの場合とその他の場合切り分けてない
       sendJoinRoom(msg);
 
       function sendJoinRoom(_msg) {
@@ -769,14 +774,30 @@ vissvr.on('connection', function(_wsCli) {
       return;
     }
 
+    //クライアントからget,subscribe等のRequestが来た場合、以下で処理
     if (obj.action === "get") {
       var reqId = obj.requestId;
       var path = obj.path;
-      var ret = _reqTable.addReqToTable(obj, null, null);
-      if (ret == false) {
-        printLog(LOG_QUIET,"  :Failed to add 'get' info to requestTable.");
+
+      //■ URATA working!
+      // Added for hachathon2018
+      var isValid = isDataPathValid(path);
+      if (reqId == undefined || path == undefined || isValid == false) {
+        //ClientにNGを返す
+        printLog(LOG_QUIET,"  :Invalid get request. Return error to client.");
+        var timestamp = new Date().getTime().toString(10);
+        var err = createErrorObj(-1,'Error: Get request is invalid.');
+        var resObj = createGetErrorResponse(reqId, err, timestamp);
+        _wsCli.send(JSON.stringify(resObj));
+
+      } else {
+        var isAddSuccess = _reqTable.addReqToTable(obj, null, null);
+        if (isAddSuccess == false) {
+          printLog(LOG_QUIET,"  :Failed to add 'get' info to requestTable.");
+          //TODO: この場合も同期的にErrorを返すべき
+        }
+        printLog(LOG_VERBOSE,"  :get request registered. reqId=" + reqId + ", path=" + path);
       }
-      printLog(LOG_VERBOSE,"  :get request registered. reqId=" + reqId + ", path=" + path);
 
     } else if (obj.action === "set") {
       printLog(LOG_DEFAULT,"  :action=" + obj.action);
@@ -784,7 +805,6 @@ vissvr.on('connection', function(_wsCli) {
       var path = obj.path;
       var value = obj.value;
       var ret = _reqTable.addReqToTable(obj, null, null);
-
       var ret = accessControlCheck(path,'set', _authHash);
       printLog(LOG_DEFAULT ,"  : accessControlCheck = " + ret );
 
@@ -831,38 +851,51 @@ vissvr.on('connection', function(_wsCli) {
 
     // for 'subscribe'
     } else if (obj.action === "subscribe") {
-
       var resObj = null;
       var reqId = obj.requestId;
       var path = obj.path;
       var action = obj.action;
-      var subId = getUniqueSubId();
-      var ret = _reqTable.addReqToTable(obj, subId, null);
       var timestamp = new Date().getTime().toString(10);
-      if (ret == false) {
-        printLog(LOG_QUIET,"  :Failed to add subscribe info to IdTable. Cancel the timer.");
-        var error = -1; //TODO: select correct error code
-        resObj = createSubscribeErrorResponse(action, reqId, path, error, timestamp);
+
+      //■ URATA working!
+      // Added for hachathon2018
+      var isValid = isDataPathValid(path);
+      if (reqId == undefined || path == undefined || isValid == false) {
+        //ClientにNGを返す
+        printLog(LOG_QUIET,"  :Invalid subscribe request. Return error to client.");
+        var err = createErrorObj(-1,'Error: Subscribe request is invalid.');
+        resObj = createSubscribeErrorResponse(action, reqId, path, err, timestamp);
+        _wsCli.send(JSON.stringify(resObj));
+
       } else {
-        printLog(LOG_DEFAULT, "  :subscribe started. reqId=" + reqId + ", subId=" + subId + ", path=" + path);
-        resObj = createSubscribeSuccessResponse(action, reqId, subId, timestamp);
+        // Success case
+        var subId = getUniqueSubId();
+        var ret = _reqTable.addReqToTable(obj, subId, null);
+        if (ret == false) {
+          printLog(LOG_QUIET,"  :Failed to add subscribe info to IdTable. Cancel the timer.");
+          var err = createErrorObj(-1,'Error: Failed to register subscribe request in VISS.');
+          resObj = createSubscribeErrorResponse(action, reqId, path, err, timestamp);
+        } else {
+          printLog(LOG_DEFAULT, "  :subscribe started. reqId=" + reqId
+                    + ", subId=" + subId + ", path=" + path);
+          resObj = createSubscribeSuccessResponse(action, reqId, subId, timestamp);
+        }
+        _wsCli.send(JSON.stringify(resObj));
       }
-      _wsCli.send(JSON.stringify(resObj));
 
     } else if (obj.action === "unsubscribe") {
       var reqId = obj.requestId; // unsub requestのreqId
       var targ_subId = obj.subscriptionId; // subscribe のsubId
       var targ_reqId = _reqTable.getReqIdBySubId(targ_subId); // subscribeのreqId
       var resObj;
-      var ret = _reqTable.delReqByReqId(targ_reqId); // subscribeのentryを削除
       var timestamp = new Date().getTime().toString(10);
-
+      var ret = _reqTable.delReqByReqId(targ_reqId); // subscribeのentryを削除
       if (ret == true) {
         printLog(LOG_DEFAULT,"  :Success to unsubscribe with subId = " + targ_subId);
         resObj = createUnsubscribeSuccessResponse(obj.action, reqId, targ_subId, timestamp);
       } else {
         printLog(LOG_QUIET,"  :Failed to unsubscribe with subId = " + targ_subId);
-        var err = -1; //TODO: select correct error value
+        var err = createErrorObj(-1,'Error: Failed to unsubscribe with subId = ' + targ_subId);
         resObj = createUnsubscribeErrorResponse(obj.action, reqId, targ_subId, err, timestamp);
       }
       _wsCli.send(JSON.stringify(resObj));
@@ -1182,13 +1215,25 @@ function printLog(lvl, msg) {
   }
 }
 
+function isString(_obj) {
+  return (typeof(_obj) === "string" || _obj instanceof String);
+}
+//URATA working
 // Verify validity of specified data path
 function isDataPathValid(_path) {
-  //これは、hackaton2018用のパスチェック
-  // TODO:
+  printLog(LOG_DEFAULT, "  :isDataPathValid: VSSPath = " + _path);
+  // これは、hackaton2018用のパスチェック
   // 長さゼロ、undefined、nullならすぐに false を返す
   // 事前にパスのリストを作っておき、照らし合わせる。
-  return true;
+  if (isString(_path) === false)
+    return false;
+  var sipPath = g_VSS_SIP_Hash[_path];
+  printLog(LOG_DEFAULT, "                  : SIPPath = " + sipPath);
+
+  if (sipPath == undefined)
+    return false;
+  else
+    return true;
 }
 
 // ==================
@@ -1372,4 +1417,111 @@ function createAuthorizeErrorResponse(reqId, err) {
   var retObj = {"action": "authorize", "requestId":reqId, "error":err};
   return retObj;
 }
+function createErrorObj(_number, _message) {
+  var err = {};
+  if (_number != undefined)
+    err.number = _number;
+  if (_message != undefined)
+    err.message = _message;
+
+  return err;
+}
+
+// =======================
+// == SIP/VSS Path List ==
+// == for h2018         ==
+// =======================
+
+// hash for convert from SIP path to VSS path
+const g_SIP_VSS_Hash = {
+    // == Vehicle Data ==
+     'Smartphone.Gps.LocationInf.latitude'        : 'Signal.Cabin.Infortainment.Navigation.Currentlocation.Latitude'    //lat
+    ,'Smartphone.Gps.LocationInf.longitude'       : 'Signal.Cabin.Infortainment.Navigation.Currentlocation.Longitude'   //lng
+    ,'Smartphone.Gps.LocationInf.altitude'        : 'Signal.Cabin.Infortainment.Navigation.Currentlocation.Altitude'    //alt
+    ,'Smartphone.Gps.LocationInf.heading'         : 'Signal.Cabin.Infortainment.Navigation.Currentlocation.Heading'     //head
+    ,'Smartphone.Gps.LocationInf.speed'           : 'Signal.Cabin.Infortainment.Navigation.Currentlocation.Speed'       //speed
+    ,'Vehicle.RunningStatus.VehicleSpeed.speed'   : 'Signal.Drivetrain.Transmission.Speed'
+    ,'Vehicle.RunningStatus.EngineSpeed.speed'    : 'Signal.Drivetrain.InternalCombustionEngine.RPM'
+    ,'Vehicle.RunningStatus.SteeringWheel.angle'  : 'Signal.Chassis.SteeringWheel.Angle'
+    ,'Vehicle.RunningStatus.AcceleratorPedalPosition.value'     :'Signal.Chassis.Accelerator.PedalPosition' //AccelPedal
+    ,'Vehicle.RunningStatus.BrakeOperation.brakePedalDepressed' :'Signal.Chassis.Brake.PedalPosition'       //BrakePedal
+    ,'Vehicle.VisionAndParking.ParkingBrake.status'             :'Signal.Chassis.ParkingBrake.IsEngaged'    //ParkingBrake
+    ,'CarAdapter.SensorData.Acceleration.x'       : 'Signal.Vehicle.Acceleration.X'    //Accel-x
+    ,'CarAdapter.SensorData.Acceleration.y'       : 'Signal.Vehicle.Acceleration.Y'    //Accel-y
+    ,'CarAdapter.SensorData.Acceleration.z'       : 'Signal.Vehicle.Acceleration.Z'    //Acdel-z
+
+    ,'CarAdapter.SensorData.Gyro.x'               : 'Signal.Vehicle.Acceleration.Pitch'   //Gyro-x
+    ,'CarAdapter.SensorData.Gyro.y'               : 'Signal.Vehicle.Acceleration.Roll'    //Gyro-y
+    ,'CarAdapter.SensorData.Gyro.z'               : 'Signal.Vehicle.Acceleration.Yaw'     //Gyro-z
+
+    ,'Vehicle.RunningStatus.Transmission.mode'        :'Signal.Drivetrain.Transmission.Gear'              //Gear
+    ,'Vehicle.RunningStatus.Fuel.Level'               :'Signal.Drivetrain.FuelSystem.Level'               //FuelLevel
+    ,'Vehicle.RunningStatus.Fuel.instantConsumption'  :'Signal.Drivetrain.FuelSystem.instantConsumption'  //instantFuelConsum
+    //,'Vehicle.RunningStatus.VehiclePowerModetype.value' :'??'  //VehiclePowerMode e.g. 'running'
+    ,'Vehicle.Maintainance.Odometer.distanceTotal'    :'Signal.OBD.DistanceWithMIL'             //distanceTotal
+    ,'Vehicle.DrivingSafety.Door.Front.Right.status'  :'Signal.Cabin.Door.Row1.Right.IsOpen'    //Door(f-r)     //Zone項目
+    ,'Vehicle.DrivingSafety.Door.Front.Left.status'   :'Signal.Cabin.Door.Row1.Left.IsOpen'     //Door(f-l)     //Zone項目
+    ,'Vehicle.DrivintSafety.Seat.Front.Right.seatbelt':'Signal.Cabin.Seat.Row1.Pos1.IsBelted'   //Seatbelt(f-r) //Zone項目
+
+    ,'Vehicle.RunningStatus.LightStatus.head'     :'Signal.Body.Light.IsLowBeamOn'  //HeadLight
+    ,'Vehicle.RunningStatus.LightStatus.highbeam' :'Signal.Body.Light.IsLowBeamOn'  //HeadLight
+    ,'Vehicle.RunningStatus.LightStatus.brake'    :'Signal.Body.Light.IsBrakeOn'    //BrakeLight
+    ,'Vehicle.RunningStatus.LightStatus.parking'  :'Signal.Body.Light.IsParkingOn'  //ParkingLight
+
+    // == Sensor 2017 ==
+    // = vital =
+    //,'Sensor.Vital.Data.beat'     // NoUse: heartrate
+    //,'Sensor.Vital.Data.cluster'  // NoUse: emotion
+    // = JINS MEME =
+    /*
+    'Sensor.Meme.Raw.eMvU'    // NoUse: eyeMoveUp
+    'Sensor.Meme.Raw.eMvD'    // NoUse: eyeMoveDown
+    'Sensor.Meme.Raw.eMvR'    // NoUse: eyeMoveRight
+    'Sensor.Meme.Raw.eMvL'    // NoUse: eyeMoveLeft
+    'Sensor.Meme.Raw.blkSp'    // NoUse: blinkSpeed
+    'Sensor.Meme.Raw.blkSt'    // NoUse: blinkStrength
+    'Sensor.Meme.Raw.pch'    // NoUse: pitch
+    'Sensor.Meme.Raw.rol'    // NoUse: roll
+    'Sensor.Meme.Raw.yaw'    // NoUse: yaw
+    'Sensor.Meme.Raw.acX'    // NoUse: accX
+    'Sensor.Meme.Raw.acY'    // NoUse: accY
+    'Sensor.Meme.Raw.acZ'    // NoUse: accZ
+    // NoUse: tilt
+    */
+
+    // == Sensor 2018 ==
+    // = JINS
+    ,'Sensor.Meme.Proc.awk':      'Private.Signal.Driver.Awakeness'// driver awakeness
+    ,'Sensor.Meme.Proc.att':      'Private.Signal.Driver.Attentiveness'// driver attentiveness
+    ,'Sensor.Meme.Proc.awk_pass': 'Private.Signal.Passenger.Awakeness'// driver awakeness
+    ,'Sensor.Meme.Proc.att_pass': 'Private.Signal.Passenger.Attentiveness'// driver attentiveness
+    ,'Sensor.Meme.Proc.awk_back': 'Private.Signal.Backseat.Awakeness'// driver awakeness
+    ,'Sensor.Meme.Proc.att_back': 'Private.Signal.Backseat.Attentiveness'// driver attentiveness
+
+    // = iPhone/iWatch/Sdtech
+    ,'Sensor.Ios.Data.altitude':     'Private.Signal.Driver.Altitude' // Altitude of driver device
+    ,'Sensor.Ios.Data.atompressure': 'Signal.OBD.BarometricPressure'
+    ,'Sensor.Vital.Data.beat':       'Private.Signal.Driver.Heartrate'
+    ,'Sensor.Vital.Data.concent':    'Private.Signal.Driver.Concentration'
+
+    // = MESH
+    ,'Sensor.Mesh.Data.temperature': 'Signal.Cabin.HVAC.AmbientAirTemperature'
+    ,'Sensor.Mesh.Data.humidity':    'Signal.Cabin.HVAC.AmbientAirHumidity'
+    ,'Sensor.Mesh.Data.trunk':       'Signal.Body.Trunk.IsOpen'
+
+    // = Bocco
+    ,'Sensor.Bocco.Data.aircon': 'Signal.Cabin.HVAC.IsAirConditioningActive'
+    ,'Sensor.Bocco.Data.window': 'Signal.Cabin.Door.Row1.Right.Window.Position'
+};
+
+//URATA working
+function getReverseHash(_orig_hash) {
+  var res_hash = {};
+  for (var i in _orig_hash) {
+    res_hash[_orig_hash[i]] = i;
+  }
+  return res_hash;
+}
+// Reversed hash
+const g_VSS_SIP_Hash = getReverseHash(g_SIP_VSS_Hash);
 
