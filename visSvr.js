@@ -1455,7 +1455,7 @@ const g_SIP_VSS_Hash = {
     ,'CarAdapter.SensorData.Gyro.z'               : 'Signal.Vehicle.Acceleration.Yaw'     //Gyro-z
 
     ,'Vehicle.RunningStatus.Transmission.mode'        :'Signal.Drivetrain.Transmission.Gear'              //Gear
-    ,'Vehicle.RunningStatus.Fuel.Level'               :'Signal.Drivetrain.FuelSystem.Level'               //FuelLevel
+    ,'Vehicle.RunningStatus.Fuel.level'               :'Signal.Drivetrain.FuelSystem.Level'               //FuelLevel
     ,'Vehicle.RunningStatus.Fuel.instantConsumption'  :'Signal.Drivetrain.FuelSystem.instantConsumption'  //instantFuelConsum
     //,'Vehicle.RunningStatus.VehiclePowerModetype.value' :'??'  //VehiclePowerMode e.g. 'running'
     ,'Vehicle.Maintainance.Odometer.distanceTotal'    :'Signal.OBD.DistanceWithMIL'             //distanceTotal
