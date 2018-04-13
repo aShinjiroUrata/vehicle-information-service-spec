@@ -32,8 +32,8 @@ var EXT_MOCK_SERVER = 1;
 var EXT_SIP_SERVER = 2;
 // Please select dataSrc from above options
 //var dataSrc = LOCAL_MOCK_DATA;
-//var dataSrc = EXT_MOCK_SERVER;
-var dataSrc = EXT_SIP_SERVER;
+var dataSrc = EXT_MOCK_SERVER;
+//var dataSrc = EXT_SIP_SERVER;
 
 // == log level ==
 var LOG_QUIET = 0 // only important log will shown
