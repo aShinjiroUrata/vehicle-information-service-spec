@@ -1222,8 +1222,8 @@ function createSetErrorResponse(reqId, error, timestamp) {
 }
 
 // == getMetadata ==
-function createVSSSuccessResponse(reqId, vss) {
-  var retObj = {"action": "getMetadata", "requestId":reqId, "vss":vss};
+function createVSSSuccessResponse(reqId, metadata) {
+  var retObj = {"action": "getMetadata", "requestId":reqId, "metadata":metadata};
   return retObj;
 }
 function createVSSErrorResponse(reqId, error, timestamp) {

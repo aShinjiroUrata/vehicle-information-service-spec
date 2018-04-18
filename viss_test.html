@@ -325,9 +325,9 @@
     if (action === "get") {
       if (isGetSuccessResponse(msg)) {
         if (reqTableItem.dispId === 'msg_vss')
-          showGetMetadataResMsg(msg.value, reqObj.action, reqObj.path);
+          showActionByPathResMsg(msg.value, reqObj.action, reqObj.path);
         else
-          showGetResMsg(msg.value, reqTableItem.dispId)
+          showActionResMsg(msg.value, reqTableItem.dispId)
 
         // delete request from requestHash. delete even in error case
         g_reqTable.deleteRequest(reqId);
@@ -358,9 +358,9 @@
       } else if (isSubscriptionNotification(msg)) {
         // case of subscribeNotification
         if (reqTableItem.dispId === 'msg_vss')
-          showGetMetadataResMsg(msg.value, reqObj.action, reqObj.path);
+          showActionByPathResMsg(msg.value, reqObj.action, reqObj.path);
         else
-          showGetResMsg(msg.value, reqTableItem.dispId)
+          showActionResMsg(msg.value, reqTableItem.dispId)
 
       } else if (isSubscriptionNotificationError(msg)) {
         // noting to do special here. continu subscribe.
@@ -415,21 +415,21 @@
     // case of 'authorize'
     } else if (action === "authorize") {
       if (isAuthorizeSuccessResponse(msg)) {
-        showGetResMsg("Authorized! TTL="+msg.TTL+"sec", reqTableItem.dispId);
+        showActionResMsg("Authorized! TTL="+msg.TTL+"sec", reqTableItem.dispId);
       } else if (isAuthorizeErrorResponse(msg)) {
-        showGetResMsg("Rejected! err="+msg.error, reqTableItem.dispId);
+        showActionResMsg("Rejected! err="+msg.error, reqTableItem.dispId);
       }
       g_reqTable.deleteRequest(reqId);
     // case of 'getMetadata'
     } else if (action === "getMetadata") {
       console.log("getMetadata:");
       // received VSS is shown in log msg textarea
-      if (isVssSuccessResponse(msg)) {
-        showGetResMsg("Successfully retrieved VSS json.", reqTableItem.dispId);
-        showInMsgArea("--:vss = " + JSON.stringify(msg.vss).substr(0,600));
-      } else if (isVssErrorResponse(msg)) {
+      if (isGetMetadataSuccessResponse(msg)) {
+        showActionResMsg("Successfully retrieved VSS json.", reqTableItem.dispId);
+        showInMsgArea("--:vss = " + JSON.stringify(msg.metadata).substr(0,600));
+      } else if (isGetMeatadataErrorResponse(msg)) {
         console.log("getMetadata: error case");
-        showGetResMsg("Failed.", reqTableItem.dispId);
+        showActionResMsg("Failed.", reqTableItem.dispId);
       } else {
         console.log("getMetadata: else case");
       }
@@ -841,15 +841,15 @@
   }
   // == getMetadata helper funcs ==
   // Judge returned Json message's type
-  function isVssSuccessResponse(msg) {
-    if (msg.action === "getMetadata" && msg.requestId != undefined && msg.vss != undefined &&
+  function isGetMetadataSuccessResponse(msg) {
+    if (msg.action === "getMetadata" && msg.requestId != undefined && msg.metadata != undefined &&
         msg.error == undefined)
       return true;
     else
       return false;
   }
-  function isVssErrorResponse(msg) {
-    if (msg.action === "getMetadata" && msg.requestId != undefined && msg.vss == undefined &&
+  function isGetMetadataErrorResponse(msg) {
+    if (msg.action === "getMetadata" && msg.requestId != undefined && msg.metadata == undefined &&
         msg.error != undefined)
       return true;
     else
@@ -878,11 +878,11 @@
     var newText = msgText + "\n" + oldText;
     targ.innerHTML = newText;
   }
-  function showGetResMsg(value, targ_id) {
+  function showActionResMsg(value, targ_id) {
     var targ = document.getElementById(targ_id);
     targ.innerHTML = value;
   }
-  function showGetMetadataResMsg(value, action, path) {
+  function showActionByPathResMsg(value, action, path) {
     var msgText = action + " : " + path + "\n==> value : "+value;
     showInMsgAreaById(msgText, 'msg_vss', 200);
   }
