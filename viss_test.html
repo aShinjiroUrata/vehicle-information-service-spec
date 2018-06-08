@@ -126,6 +126,15 @@
 
   <script>
 
+  // Data Path
+  //const DATA_VSPEED = "Signal.Drivetrain.Transmission.Speed"; // for hackathon
+  const DATA_VSPEED = "Signal.Vehicle.Speed"; // for RenesasV2C
+  //const DATA_ESPEED = "Signal.Drivetrain.InternalCombustionEngine.RPM"; // for hackathon
+  const DATA_ESPEED = "Signal.Drivetrain.InternalCombustionEngine.Engine.Speed"; // for RenesasV2C
+  const DATA_STEER = "Signal.Chassis.SteeringWheel.Angle";
+  const DATA_DOOR_FR_ISLOCK = "Signal.Cabin.Door.Row1.Right.IsLocked";
+  const DATA_HVAC_FR_TEMP = "Signal.Cabin.HVAC.Row1.RightTemperature";
+
   // WebSocket readyState
   var WS_CONNECTING = 0;
   var WS_OPEN       = 1;
@@ -529,13 +538,13 @@
     }
   }
   function btnGetSpeed() {
-    wsGetItem("Signal.Drivetrain.Transmission.Speed", "msg_get_speed" );
+    wsGetItem(DATA_VSPEED, "msg_get_speed" );
   }
   function btnGetEngineRPM() {
-    wsGetItem("Signal.Drivetrain.InternalCombustionEngine.RPM", "msg_get_rpm");
+    wsGetItem(DATA_ESPEED, "msg_get_rpm");
   }
   function btnGetSteeringAngle() {
-    wsGetItem("Signal.Chassis.SteeringWheel.Angle", "msg_get_steer");
+    wsGetItem(DATA_STEER, "msg_get_steer");
   }
 
   // === set ===
@@ -554,18 +563,18 @@
   }
   function btnSetDoorRow1RightLock() {
     var value = document.getElementById("txt_set_doorRow1RightLock").value;
-    wsSetItem("Signal.Cabin.Door.Row1.Right.IsLocked", value, "txt_set_doorRow1RightLock");
+    wsSetItem(DATA_DOOR_FR_ISLOCK, value, "txt_set_doorRow1RightLock");
   }
   function btnGetDoorRow1RightLock() {
-    wsGetItem("Signal.Cabin.Door.Row1.Right.IsLocked", "msg_get_doorRow1RightLock");
+    wsGetItem(DATA_DOOR_FR_ISLOCK, "msg_get_doorRow1RightLock");
   }
 
   function btnSetHVACRow1RightTemp() {
     var value = document.getElementById("txt_set_hvacRow1RightTemp").value;
-    wsSetItem("Signal.Cabin.HVAC.Row1.RightTemperature", value, "txt_set_hvacRow1RightTemp");
+    wsSetItem(DATA_HVAC_FR_TEMP, value, "txt_set_hvacRow1RightTemp");
   }
   function btnGetHVACRow1RightTemp() {
-    wsGetItem("Signal.Cabin.HVAC.Row1.RightTemperature", "msg_get_hvacRow1RightTemp");
+    wsGetItem(DATA_HVAC_FR_TEMP, "msg_get_hvacRow1RightTemp");
   }
 
   // === subscribe/unsubscribe ===
@@ -614,12 +623,12 @@
       return;
     }
     g_ui.speedReqId = getUniqueReqId();
-    var path = "Signal.Drivetrain.Transmission.Speed";
+    var path = DATA_VSPEED;
     var ret = wsSubscribeItem(path, g_ui.speedReqId, "msg_sub_speed");
     if (!ret) g_ui.speedReqId = null;
   }
   function btnUnsubscribeSpeed() {
-    var path = "Signal.Drivetrain.Transmission.Speed";
+    var path = DATA_VSPEED;
     var targ_subId = g_reqTable.getSubIdByReqId(g_ui.speedReqId); //unsub対象のsubIdを取得
     wsUnsubscribeItem(path, targ_subId, "msg_sub_speed");
   }
@@ -630,12 +639,12 @@
       return;
     }
     g_ui.engineRpmReqId = getUniqueReqId();
-    var path = "Signal.Drivetrain.InternalCombustionEngine.RPM";
+    var path = DATA_ESPEED;
     var ret = wsSubscribeItem(path, g_ui.engineRpmReqId, "msg_sub_rpm");
     if (!ret) g_ui.engineRpmReqId = null;
   }
   function btnUnsubscribeEngineRpm() {
-    var path = "Signal.Drivetrain.InternalCombustionEngine.RPM"
+    var path = DATA_ESPEED
     var targ_subId = g_reqTable.getSubIdByReqId(g_ui.engineRpmReqId);
     wsUnsubscribeItem(path, targ_subId, "msg_sub_rpm");
   }
@@ -646,12 +655,12 @@
       return;
     }
     g_ui.steerAngleReqId = getUniqueReqId();
-    var path = "Signal.Chassis.SteeringWheel.Angle";
+    var path = DATA_STEER;
     var ret = wsSubscribeItem(path, g_ui.steerAngleReqId, "msg_sub_steer");
     if (!ret) g_ui.steerAngleReqId = null;
   }
   function btnUnsubscribeSteerAngle() {
-    var path = "Signal.Chassis.SteeringWheel.Angle";
+    var path = DATA_STEER;
     var targ_subId = g_reqTable.getSubIdByReqId(g_ui.steerAngleReqId);
     wsUnsubscribeItem(path, targ_subId, "msg_sub_steer");
   }

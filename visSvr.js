@@ -30,10 +30,10 @@ var EXT_SIPSVR_ROOMID = svr_config.HKSV_ROOMID;
 var LOCAL_MOCK_DATA = 0;
 var EXT_MOCK_SERVER = 1;
 var EXT_SIP_SERVER = 2;
+var EXT_V2C_CLIENT = 3; // V2Cの場合、dataSrc がws clientになる
 // Please select dataSrc from above options
-//var dataSrc = LOCAL_MOCK_DATA;
-var dataSrc = EXT_MOCK_SERVER;
-//var dataSrc = EXT_SIP_SERVER;
+//var dataSrc = EXT_MOCK_SERVER;
+var dataSrc = EXT_V2C_CLIENT;
 
 // == log level ==
 var LOG_QUIET = 0 // only important log will shown
@@ -268,57 +268,6 @@ var g_extSIPDataSrc = {
     - データ間引くことも可能(0.5sec単位とか)
     - このnodeアプリAWS上で稼働。1プロセスで全利用者の処理をさばく
   */
-  /*
-  convertFormatFromSIPToVSS_old: function(sipData) {
-    var vssData;
-    var sipObj;
-    try {
-      sipObj = JSON.parse(sipData);
-    } catch(e) {
-      //iregurlar Json case
-      printLog(LOG_DEFAULT,"  :received irregular Json messaged. ignored.");
-      printLog(LOG_DEFAULT,"  :Error = "+e);
-      return;
-    }
-    var vehicleSpeed = this.getValueFromSIPObj(sipObj,"Vehicle.RunningStatus.VehicleSpeed.speed");
-    var engineSpeed = this.getValueFromSIPObj(sipObj,"Vehicle.RunningStatus.EngineSpeed.speed");
-    var steeringWheel = this.getValueFromSIPObj(sipObj,"Vehicle.RunningStatus.SteeringWheel.angle");
-
-    // Create VSS format JSON
-    // TODO: need brush up.
-    var vssObj = new Array();
-    if (vehicleSpeed != undefined) {
-      printLog(LOG_VERBOSE,"  :vehicleSpeed.value=" + vehicleSpeed.value);
-      printLog(LOG_VERBOSE,"  :vehicleSpeed.timestamp=" + vehicleSpeed.timestamp);
-      var obj =
-      { "path": "Signal.Drivetrain.Transmission.Speed",
-        "value": vehicleSpeed.value,
-        "timestamp":vehicleSpeed.timestamp};
-      vssObj.push(obj);
-    }
-    if (engineSpeed != undefined) {
-      var obj =
-      { "path": "Signal.Drivetrain.InternalCombustionEngine.RPM",
-        "value": engineSpeed.value,
-        "timestamp":engineSpeed.timestamp};
-      vssObj.push(obj);
-    }
-    if (steeringWheel != undefined) {
-      var obj =
-      { "path": "Signal.Chassis.SteeringWheel.Angle",
-        "value": steeringWheel.value,
-        "timestamp":steeringWheel.timestamp};
-      vssObj.push(obj);
-    }
-    if (vssObj.length > 1) {
-      var obj = {"data": vssObj};
-      var vssStr = JSON.stringify(obj);
-      return vssStr;
-    } else {
-      return undefined;
-    }
-  },
-  */
 
   convertHash : {
     //lat
@@ -449,31 +398,6 @@ var g_extSIPDataSrc = {
       return undefined;
     }
   },
-
-  // pick out an object from SIP formed JSON by specifing 'path'
-  // return value format: {value, timestamp}
-  /*
-  getValueFromSIPObj: function(origObj, path) {
-    var pathElem = path.split(".");
-    var len = pathElem.length;
-    var obj = origObj;
-    var retObj = undefined;
-    for (var i=0; i<len; i++) {
-      if(obj[pathElem[i]]==undefined) {
-        return undefined;
-      } else if (i<(len-1) && obj[pathElem[i]]!=undefined) {
-        // Still there is next
-        obj = obj[pathElem[i]];
-      } else if (i==(len-1) && obj[pathElem[i]]!=undefined) {
-        // Reached to the data!
-        retObj = {};
-        retObj.value = obj[pathElem[i]];
-        retObj.timestamp = obj['timeStamp']; //SIP's timestamp is 'timeStamp'.
-      }
-    }
-    return retObj;
-  }
-  */
 }
 
 if (dataSrc === EXT_SIP_SERVER) {
@@ -493,6 +417,156 @@ if (dataSrc === EXT_SIP_SERVER) {
         sioClient.emit('joinRoom', JSON.stringify(msg));
     });
   }
+}
+
+// ==============================================
+// == dataSrc connection: V2C websocket client ==
+// ==============================================
+// #use socket.io by requirement of Hackathon server
+const EXT_V2C_IP = '127.0.0.1';
+const EXT_V2C_PORT = '8089';
+var g_extV2CDataSrc = {
+  // roomID: EXT_SIPSVR_ROOMID,  // def in 'svr_config.js'
+  svrUrl: "ws://" + EXT_SIPSVR_IP + ":" + EXT_SIPSVR_PORT,  //def in 'svr_config.js'
+
+  // Convert data from SIP's format(hackathon format) to VSS format
+  // TODO: re-write in better way
+  // (first version is ad-hoc lazy implementation)
+  // TODO:
+  //  - SIPからVSSへのデータ変換。外部にテーブルを定義してそれを元に変換する
+
+  convertHash : {
+//  'Ver':
+//, 'Timestamp':
+ 'geometry.coordinates.Altitude'                    :'Signal.Cabin.Infotainment.Navigation.CurrentLocation.Altitude'
+,'geometry.coordinates.Longitude'                   :'Signal.Cabin.Infotainment.Navigation.CurrentLocation.Altitude'
+,'geometry.coordinates.Latitude'                    :'Signal.Cabin.Infotainment.Navigation.CurrentLocation.Latitude'
+,'RunningStatus.Vehicle.Speed'                      :'Signal.Vehicle.Speed'
+,'RunningStatus.Engine.Speed'                       :'Signal.Drivetrain.InternalCombustionEngine.Engine.Speed'
+,'RunningStatus.SteeringWheel.Angle'                :'Signal.Chassis.SteeringWheel.Angle'
+,'Body.Door.FrontLeft.IsOpen'                       :'Signal.Cabin.Door.Row1.Left.IsOpen'
+//  'Vehicle.RunningStatus.VehicleSpeed.speed'    : 'Signal.Drivetrain.Transmission.Speed'
+//  ,'Vehicle.RunningStatus.EngineSpeed.speed'    : 'Signal.Drivetrain.InternalCombustionEngine.RPM'
+//  ,'Vehicle.RunningStatus.SteeringWheel.angle'  : 'Signal.Chassis.SteeringWheel.Angle'
+  },
+
+  // V2C JSON obj を json objのArrayに変換する
+  convertV2CObjToV2CArry: (_obj) => {
+    //console.log('convertV2CObjToV2cArry: ');
+    let resArry = [];
+    for(let key in _obj) {
+      findLeaf(key, _obj[key], key);
+    }
+    function findLeaf(_key, _value, _path) {
+      //console.log('findLeaf: key = '+_key);
+      if (typeof(_value) !== 'object') {
+        // not objectならleaf(末端)と判断する
+        let item = {path: _path, value: _value};
+        resArry.push(item);
+      } else {
+        for(let key in _value) {
+          const newpath = _path + '.' + key;
+          findLeaf(key, _value[key], newpath);
+        }
+      }
+    }
+    console.log('V2CObjToArry: Res= ' + JSON.stringify(resArry));
+    return resArry;
+  },
+
+  convertV2CFormatToVSS: (_v2cObj) => {
+    //console.log('convertV2CFormatToVSS: ');
+    let vssArry = [];
+    //まず、v2cObjをJSONから配列形式に変換
+    const v2cArry = g_extV2CDataSrc.convertV2CObjToV2CArry(_v2cObj);
+
+    //次に、v2cの配列を、GeniviVSSの配列に変換
+    const len = v2cArry.length;
+    let timestamp = undefined;
+    for(let i=0; i<len; i++) {
+      if (v2cArry[i].path === 'Timestamp') {
+        timestamp = v2cArry[i].value;
+        continue;
+      }
+      const vssPath = g_extV2CDataSrc.convertHash[v2cArry[i].path];
+      if (vssPath === undefined) {
+        continue;
+      } else {
+        const item = {'path'  : vssPath,
+                      'value' : v2cArry[i].value,
+                      'timestamp' : timestamp};
+        vssArry.push(item);
+      }
+    }
+    if (vssArry.length > 0) {
+      var obj = {'action':'data', 'data': vssArry};
+      var vssStr = JSON.stringify(obj);
+      console.log('V2CFormToVSS: Res= ' + vssStr);
+      return vssStr;
+    } else {
+      return undefined;
+    }
+  },
+}
+
+if (dataSrc === EXT_V2C_CLIENT) {
+  // websocket-node で websocket serverを立てる
+  // その後、vehicledata が送られてきたら
+  // - Genivi VSS形式に変換
+  // VISS本体に流す
+  const WebSocketServer = require('websocket').server;
+  const http = require('http');
+
+  const server = http.createServer(function(req, res) {
+    console.log('Http Req received for ' + req.url);
+    res.writeHead(404);
+    res.end();
+  });
+  server.listen(8089, function() {
+    console.log('Http Server is listening on 8089');
+  });
+
+  console.log('new WebSocketSvr');
+  const wsServer = new WebSocketServer({
+    httpServer: server,
+    autoAcceptConnections: false
+  });
+  function originIsAllowed(origin) {
+    return true;
+  }
+
+  wsServer.on('request', function(req) {
+    console.log('on request');
+    // 許可されたorigin からのアクセス以外は拒絶する
+    if (!originIsAllowed(req.origin)) {
+      req.reject();
+      console.log('Connection from origin ' + req.origin + 'rejected');
+      return;
+    }
+
+    //const conn = req.accept('echo-protocol', req.origin); // subproto使う場合
+    const conn = req.accept();
+    conn.on('message', function(msg) {
+      console.log('on message');
+      if (msg.type === 'utf8') {
+        //console.log('Received Msg: ' + msg.utf8Data);
+        // データ受信は出来た
+        // V2C Simu 形式から Genvi VSS形式に変換
+        // jsonは一単位ずつ送付される想定
+        const vssArry = g_extV2CDataSrc.convertV2CFormatToVSS(JSON.parse(msg.utf8Data));
+        //console.log('ConvRes: ' + vssArry);
+
+        // コンバート後、VISSにデータを送付
+        // データをVISSに流すだけ。hackathonのjoinRoomは非対応
+        if (vssArry != undefined) {
+          dataReceiveHandler(vssArry);
+        }
+      }
+    });
+    conn.on('close', function(reasonCode, desc) {
+      console.log('Peer ' + conn.remoteAddress + ' disconnected');
+    });
+  });
 }
 
 // =============================
@@ -936,7 +1010,8 @@ function dataReceiveHandler(message) {
 // _dataObj: mockDataSrcからのJson Obj
 // _reqObj : get, subscribeなどのrequest情報のObj
 function matchPathJson (_reqObj, _dataObj) {
-  if (dataSrc === EXT_SIP_SERVER  ) {
+  if (dataSrc === EXT_SIP_SERVER ||
+      dataSrc === EXT_V2C_CLIENT  ) {
     // getting data from Hackathon Server case
     return matchPathJson_SIPDataSrc(_reqObj, _dataObj);
   } else {
