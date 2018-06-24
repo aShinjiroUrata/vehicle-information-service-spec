@@ -26,6 +26,8 @@ var EXT_SIPSVR_IP     = svr_config.HKSV_SRC_IP;
 var EXT_SIPSVR_PORT   = svr_config.HKSV_SRC_PORT;
 var EXT_SIPSVR_ROOMID = svr_config.HKSV_ROOMID;
 
+var V2C_WS_SVR_PORT = svr_config.V2C_WS_SVR_PORT;
+
 // == data source selection ==
 var LOCAL_MOCK_DATA = 0;
 var EXT_MOCK_SERVER = 1;
@@ -470,7 +472,7 @@ var g_extV2CDataSrc = {
         }
       }
     }
-    console.log('V2CObjToArry: Res= ' + JSON.stringify(resArry));
+    //console.log('V2CObjToArry: Res= ' + JSON.stringify(resArry));
     return resArry;
   },
 
@@ -501,7 +503,7 @@ var g_extV2CDataSrc = {
     if (vssArry.length > 0) {
       var obj = {'action':'data', 'data': vssArry};
       var vssStr = JSON.stringify(obj);
-      console.log('V2CFormToVSS: Res= ' + vssStr);
+      //console.log('V2CFormToVSS: Res= ' + vssStr);
       return vssStr;
     } else {
       return undefined;
@@ -514,6 +516,7 @@ if (dataSrc === EXT_V2C_CLIENT) {
   // その後、vehicledata が送られてきたら
   // - Genivi VSS形式に変換
   // VISS本体に流す
+
   const WebSocketServer = require('websocket').server;
   const http = require('http');
 
@@ -522,8 +525,9 @@ if (dataSrc === EXT_V2C_CLIENT) {
     res.writeHead(404);
     res.end();
   });
-  server.listen(8089, function() {
-    console.log('Http Server is listening on 8089');
+
+  server.listen(V2C_WS_SVR_PORT, function() {
+    console.log('V2C WS Svr is listening on ' + V2C_WS_SVR_PORT);
   });
 
   console.log('new WebSocketSvr');
@@ -547,7 +551,7 @@ if (dataSrc === EXT_V2C_CLIENT) {
     //const conn = req.accept('echo-protocol', req.origin); // subproto使う場合
     const conn = req.accept();
     conn.on('message', function(msg) {
-      console.log('on message');
+      //console.log('on message');
       if (msg.type === 'utf8') {
         //console.log('Received Msg: ' + msg.utf8Data);
         // データ受信は出来た
@@ -1050,7 +1054,7 @@ function matchPathJson_SIPDataSrc(_reqObj, _dataArry) {
   for (var i in _dataArry) {
     obj = _dataArry[i];
     if (reqPath === obj.path) {
-      console.log('matched!!: obj = ' + JSON.stringify(obj));
+      //console.log('matched!!: obj = ' + JSON.stringify(obj));
       return obj;
     }
   }
