@@ -26,7 +26,8 @@ var EXT_SIPSVR_IP     = svr_config.HKSV_SRC_IP;
 var EXT_SIPSVR_PORT   = svr_config.HKSV_SRC_PORT;
 var EXT_SIPSVR_ROOMID = svr_config.HKSV_ROOMID;
 
-var V2C_WS_SVR_PORT = svr_config.V2C_WS_SVR_PORT;
+var EXT_V2CSVR_PORT = svr_config.V2C_WS_SVR_PORT;
+// EXT_V2CSVR_IP is not needed.
 
 // == data source selection ==
 var LOCAL_MOCK_DATA = 0;
@@ -34,7 +35,7 @@ var EXT_MOCK_SERVER = 1;
 var EXT_SIP_SERVER = 2;
 var EXT_V2C_CLIENT = 3; // V2Cの場合、dataSrc がws clientになる
 // Please select dataSrc from above options
-//var dataSrc = EXT_MOCK_SERVER;
+// var dataSrc = EXT_MOCK_SERVER;
 var dataSrc = EXT_V2C_CLIENT;
 
 // == log level ==
@@ -526,8 +527,8 @@ if (dataSrc === EXT_V2C_CLIENT) {
     res.end();
   });
 
-  server.listen(V2C_WS_SVR_PORT, function() {
-    console.log('V2C WS Svr is listening on ' + V2C_WS_SVR_PORT);
+  server.listen(EXT_V2CSVR_PORT, function() {
+    console.log('V2C WS Svr is listening on ' + EXT_V2CSVR_PORT);
   });
 
   console.log('new WebSocketSvr');
