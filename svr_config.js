@@ -5,7 +5,7 @@
 
 // for localhost
 var VISS_IP_PUB = '127.0.0.1';  // used from test-ui.html
-var VISS_IP_PRV = '127.0.0.1';  // used in visSvr.js to start WebSocket server
+var VISS_IP_PRV = VISS_IP_PUB;  // used in visSvr.js to start WebSocket server
 var VISS_IP = VISS_IP_PUB;
 /*
 // Setting for AWS3
@@ -13,7 +13,7 @@ var VISS_IP_PUB = '18.218.22.209';  // used from test-ui.html
 var VISS_IP_PRV = '172.31.36.132';  // used in visSvr.js to start WebSocket server
 */
 
-var VISS_PORT     = '3001';
+var VISS_PORT     = '8087';
 var VISS_SUBPROTO = 'wvss1.0';
 
 // for mockDataSrc
