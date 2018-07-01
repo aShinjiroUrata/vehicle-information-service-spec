@@ -442,15 +442,70 @@ var g_extV2CDataSrc = {
 //  'Ver':
 //, 'Timestamp':
  'geometry.coordinates.Altitude'                    :'Signal.Cabin.Infotainment.Navigation.CurrentLocation.Altitude'
-,'geometry.coordinates.Longitude'                   :'Signal.Cabin.Infotainment.Navigation.CurrentLocation.Altitude'
+,'geometry.coordinates.Longitude'                   :'Signal.Cabin.Infotainment.Navigation.CurrentLocation.Longitude'
 ,'geometry.coordinates.Latitude'                    :'Signal.Cabin.Infotainment.Navigation.CurrentLocation.Latitude'
-,'RunningStatus.Vehicle.Speed'                      :'Signal.Vehicle.Speed'
-,'RunningStatus.Engine.Speed'                       :'Signal.Drivetrain.InternalCombustionEngine.Engine.Speed'
-,'RunningStatus.SteeringWheel.Angle'                :'Signal.Chassis.SteeringWheel.Angle'
-,'Body.Door.FrontLeft.IsOpen'                       :'Signal.Cabin.Door.Row1.Left.IsOpen'
-//  'Vehicle.RunningStatus.VehicleSpeed.speed'    : 'Signal.Drivetrain.Transmission.Speed'
-//  ,'Vehicle.RunningStatus.EngineSpeed.speed'    : 'Signal.Drivetrain.InternalCombustionEngine.RPM'
-//  ,'Vehicle.RunningStatus.SteeringWheel.angle'  : 'Signal.Chassis.SteeringWheel.Angle'
+
+,'RunningStatus.Acceleration.X'     :'Signal.Vehicle.Acceleration.Longitudinal'
+,'RunningStatus.Acceleration.Y'     :'Signal.Vehicle.Acceleration.Lateral'
+,'RunningStatus.Acceleration.Z'     :'Signal.Vehicle.Acceleration.Vertical'
+
+,'RunningStatus.Vehicle.Speed'              :'Signal.Vehicle.Speed'
+,'RunningStatus.Engine.Speed'               :'Signal.Drivetrain.InternalCombustionEngine.Engine.Speed'
+,'RunningStatus.Brake.PedalPosition'        :'Signal.Chassis.Brake.PedalPosition'
+,'RunningStatus.Accelerator.PedalPosition'  :'Signal.Chassis.Accelerator.PedalPosition'
+,'RunningStatus.Fuel.Level'                 :'Signal.Drivetrain.FuelSystem.Level'
+,'RunningStatus.SteeringWheel.Angle'        :'Signal.Chassis.SteeringWheel.Angle'
+,'RunningStatus.Transmission.Gear'          :'Signal.Drivetrain.Transmission.Gear'
+,'RunningStatus.ParkingBrake.IsEngaged'     :'Signal.Chassis.ParkingBrake.IsEngaged'
+,'RunningStatus.Battery.Capacity'           :'Signal.Drivetrain.BatteryManagement.BatteryCapacity'
+
+,'Body.Door.FrontLeft.IsOpen'           :'Signal.Cabin.Door.Row1.Left.IsOpen'
+,'Body.Door.FrontLeft.IsLocked'         :'Signal.Cabin.Door.Row1.Left.IsLocked'
+,'Body.Door.FrontLeft.windowPosition'   :'Signal.Cabin.Door.Row1.Left.Window.Position'
+,'Body.Door.FrontLeft.IsMirrorOpen'     :'Signal.Body.Mirrors.Left.Pan'
+,'Body.Door.FrontRight.IsOpen'          :'Signal.Cabin.Door.Row1.Right.IsOpen'
+,'Body.Door.FrontRight.IsLocked'        :'Signal.Cabin.Door.Row1.Right.IsLocked'
+,'Body.Door.FrontRight.windowPosition'  :'Signal.Cabin.Door.Row1.Right.Window.Position'
+,'Body.Door.FrontRight.IsMirrorOpen'    :'Signal.Body.Mirrors.Right.Pan'
+,'Body.Door.RearLeft.IsOpen'            :'Signal.Cabin.Door.Row2.Left.IsOpen'
+,'Body.Door.RearLeft.IsLocked'          :'Signal.Cabin.Door.Row2.Left.IsLocked'
+,'Body.Door.RearLeft.windowPosition'    :'Signal.Cabin.Door.Row2.Left.Window.Position'
+,'Body.Door.RearRight.IsOpen'           :'Signal.Cabin.Door.Row2.Right.IsOpen'
+,'Body.Door.RearRight.IsLocked'         :'Signal.Cabin.Door.Row2.Right.IsLocked'
+,'Body.Door.RearRight.windowPosition'   :'Signal.Cabin.Door.Row2.Right.Window.Position'
+
+,'Body.Bonnet.IsOpen'       :'Signal.Body.Hood.IsOpen'
+,'Body.Trunk.IsOpen'        :'Signal.Body.Trunk.IsOpen'
+,'Body.Light.IsHazardOn'    :'Signal.Body.Lights.IsHazardOn'
+,'Body.Wiper.Front.Status'  :'Signal.Body.Windshield.Front.Wiping.Status'
+,'Body.Wiper.Rear.Status'   :'Signal.Body.Windshield.Rear.Wiping.Status'
+,'Body.FuelCap.IsOpen'      :'Signal.Body.FuelCap.IsOpen'
+
+,'Cabin.Seat.FrontLeft.Recline'       :'Signal.Cabin.Seat.Row1.Pos1.Recline'
+,'Cabin.Seat.FrontLeft.IsSeatbeltOn'  :'Signal.Cabin.Seat.Row1.Pos1.IsBelted'
+,'Cabin.Seat.FrontRight.Recline'      :'Signal.Cabin.Seat.Row1.Pos2.Recline'
+,'Cabin.Seat.FrontRight.IsSeatbeltOn' :'Signal.Cabin.Seat.Row1.Pos2.IsBelted'
+,'Cabin.Seat.RearLeft.Recline'        :'Signal.Cabin.Seat.Row2.Pos1.Recline'
+,'Cabin.Seat.RearLeft.IsSeatbeltOn'   :'Signal.Cabin.Seat.Row2.Pos1.IsBelted'
+,'Cabin.Seat.RearRight.Recline'       :'Signal.Cabin.Seat.Row2.Pos2.Recline'
+,'Cabin.Seat.RearRight.IsSeatbeltOn'  :'Signal.Cabin.Seat.Row2.Pos2.IsBelted'
+
+,'Cabin.HVAC.FrontLeft.Temperature'   :'Signal.Cabin.HVAC.Row1.Left.Temperature'
+,'Cabin.HVAC.FrontRight.Temperature'  :'Signal.Cabin.HVAC.Row1.Right.Temperature'
+,'Cabin.HVAC.RearLeft.Temperature'    :'Signal.Cabin.HVAC.Row2.Left.Temperature'
+,'Cabin.HVAC.RearRight.Temperature'   :'Signal.Cabin.HVAC.Row2.Right.Temperature'
+,'Cabin.HVAC.AmbientAir.Temperature'  :'Signal.Cabin.HVAC.AmbientAirTemperature'
+,'Cabin.Sunroof.Position'             :'Signal.Cabin.Sunroof.Position'
+
+,'DriveTrain.Tire.FrontLeft.Pressure'   :'Signal.Chassis.Axle.Row1.Wheel.Left.Tire.Pressure'
+,'DriveTrain.Tire.FrontRight.Pressure'  :'Signal.Chassis.Axle.Row1.Wheel.Right.Tire.Pressure'
+,'DriveTrain.Tire.RearLeft.Pressure'    :'Signal.Chassis.Axle.Row2.Wheel.Left.Tire.Pressure'
+,'DriveTrain.Tire.RearRight.Pressure'   :'Signal.Chassis.Axle.Row2.Wheel.Right.Tire.Pressure'
+
+,'Event.Event1'    :'Private.V2C.Events.Event1'
+,'Event.Event2'    :'Private.V2C.Events.Event2'
+,'Event.Event3'    :'Private.V2C.Events.Event3'
+
   },
 
   // V2C JSON obj を json objのArrayに変換する
