@@ -505,6 +505,8 @@ var g_extV2CDataSrc = {
 ,'Event.Event1'    :'Private.V2C.Events.Event1'
 ,'Event.Event2'    :'Private.V2C.Events.Event2'
 ,'Event.Event3'    :'Private.V2C.Events.Event3'
+,'Event.Event4'    :'Private.V2C.Events.Event4'
+,'Event.Event5'    :'Private.V2C.Events.Event5'
 
   },
 
