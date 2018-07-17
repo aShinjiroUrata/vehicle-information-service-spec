@@ -140,12 +140,10 @@ const ReqDict = (function() {
   return reqDict;
 })();
 
-
 // =======================
 // == VISClient Class   ==
 // == (= Core of VIAS ) ==
 // =======================
-//class VISClient {
 const VISClient = (function() {
 
   // ==================
@@ -160,10 +158,8 @@ const VISClient = (function() {
   let g_reqDict = new ReqDict();
   let connection = null;
 
-  // connection error用Cb
   let onConnectErrCb = null;
   let onDisconnectSucCb = null;
-  //var wsCloseCb = null;
 
   // =================
   // == constructor ==
@@ -224,15 +220,12 @@ const VISClient = (function() {
       return;
     }
 
-    // get用JSONを作成
     let reqId = issueNewReqId();
     let req = {'action': 'get', 'path': _path, 'requestId':reqId};
 
-    // sucCb, errCb, reqIdはハッシュに登録しておく
     let obj = {'reqObj': req, 'sucCb': _sucCb, 'errCb': _errCb};
     g_reqDict.addRequest(reqId, obj);
 
-    // ws で送付
     let json_str = JSON.stringify(req);
     connection.send(json_str);
 
@@ -509,7 +502,7 @@ const VISClient = (function() {
       }
 
     } else if (action === 'subscription') {
-      //       VISS は未対応なので、まだ使わない。
+      // TODO: 'subscription' is not supported yet
 
     } else if (action === 'unsubscribe') {
       dbgLog('WsMsg:unSubscribe: received');
