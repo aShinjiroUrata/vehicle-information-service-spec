@@ -1,3 +1,5 @@
+// Copyright (c) 2018 ACCESS CO., LTD. All rights reserved.
+//
 // ========================================
 // VIAS proto
 // ========================================
@@ -782,20 +784,23 @@ const VISClient = (function() {
 
   // ======================
   // == Utility function ==
-  //TODO よりちゃんとしたuniqueIDにしたい
+  function uuid4() {
+    let uuid = '', i, random;
+    for (i = 0; i < 32; i++) {
+      random = Math.random() * 16 | 0;
+
+      if (i == 8 || i == 12 || i == 16 || i == 20) {
+        uuid += '-';
+      }
+      uuid += (i == 12 ? 4 : (i == 16 ? (random & 3 | 8) : random)).toString(16);
+    }
+    return uuid;
+  }
   function issueNewReqId() {
-    // create semi-uniquID (for implementation easyness) as timestamp(milli sec)+random string
-    // uniqueness is not 100% guaranteed.
-    let strength = 1000;
-    let uniq = new Date().getTime().toString(16) + Math.floor(strength*Math.random()).toString(16);
-    return 'reqid-'+uniq;
+    return 'reqid-' + uuid4();
   }
   function issueNewCliSubId() {
-    // create semi-uniquID (for implementation easyness) as timestamp(milli sec)+random string
-    // uniqueness is not 100% guaranteed.
-    let strength = 1000;
-    let uniq = new Date().getTime().toString(16) + Math.floor(strength*Math.random()).toString(16);
-    return 'clisubid-'+uniq;
+    return 'clisubid-' + uuid4();
   }
   function getUnixEpochTimestamp() {
     // get mili sec unix epoch string
