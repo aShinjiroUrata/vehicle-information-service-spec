@@ -508,6 +508,14 @@ var g_extV2CDataSrc = {
 ,'Event.Event4'    :'Private.V2C.Events.Event4'
 ,'Event.Event5'    :'Private.V2C.Events.Event5'
 
+,'Emotion.Calm'          : 'Private.V2C.Emotion.Calm'
+,'Emotion.Angry'         : 'Private.V2C.Emotion.Angry'
+,'Emotion.Joy'           : 'Private.V2C.Emotion.Joy'
+,'Emotion.Sorrow'        : 'Private.V2C.Emotion.Sorrow'
+,'Emotion.Excite'        : 'Private.V2C.Emotion.Excite'
+,'Emotion.Level'         : 'Private.V2C.Emotion.Level'
+,'Emotion.PrimaryEmotion': 'Private.V2C.Emotion.PrimaryEmotion'
+
   },
 
   // V2C JSON obj を json objのArrayに変換する
