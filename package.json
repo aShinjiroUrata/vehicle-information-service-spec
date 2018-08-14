@@ -1,0 +1,19 @@
+{
+  "name": "vehicle-information-service-spec",
+  "version": "1.0.0",
+  "description": "last update: March 22, 2017",
+  "main": "visSvr.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aShinjiroUrata/vehicle-information-service-spec.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/aShinjiroUrata/vehicle-information-service-spec/issues"
+  },
+  "homepage": "https://github.com/aShinjiroUrata/vehicle-information-service-spec#readme"
+}
