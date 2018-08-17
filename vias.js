@@ -1,16 +1,8 @@
+// Copyright (c) 2018 ACCESS CO., LTD. All rights reserved.
+//
 // ========================================
 // VIAS proto
 // ========================================
-
-// シンプルなコンストラクタとして作る
-// ES6 class で作成の予定だったが、その場合
-// private property/method の実現方式のbest practiceが
-// 不明確のため、ES5の旧式のclass作成方式を使用した
-// private な property は特に作らない。当面は。
-// TODO: と思ったが、一般に使ってもらう lib とするには、
-// 余計なものを隠蔽することが必要
-
-// ==============================
 
 // == Request Dictionary Class ==
 // ##define class in conventional method
@@ -49,7 +41,6 @@ const ReqDict = (function() {
     let cliSubId = mainDict[_reqId].cliSubId;
     delete mainDict[_reqId];
 
-    // TODO: unsubscribeのエントリは*SubIdDictには登録しない
     // delete entry from *SubIdDict
     if (svrSubId != undefined && svrSubIdDict[svrSubId] != undefined)
       delete svrSubIdDict[svrSubId];
@@ -104,12 +95,6 @@ const ReqDict = (function() {
 
   };
   p.deleteAllSubscription = function() {
-    // すべてのsubscribeエントリを、g_reqDictから消去する
-    // - すべての cliSubIdDict エントリに対応するreqIdを取得
-    // - reqId のエントリを mainDictから削除
-    // - svrSubIdDicについても同じことを行う
-    //   (ただし、cliSubIdDictと被っているので、mainDictからすべて削除済みのはず)
-    // - cliSubIdDictと、svrSubIdDictを空にする
     let reqId = null;
     for (let key in cliSubIdDict) {
       reqId = cliSubIdDict[key];
@@ -126,14 +111,12 @@ const ReqDict = (function() {
     svrSubIdDict = {};
   };
   p.convertSvrSubIdToReqId = function(_subId) {
-    //TODOTODOTODO
     let reqId = svrSubIdDict[_subId];
     if (reqId == undefined || reqId == null)
       return null;
     return reqId;
   };
   p.convertReqIdToSvrSubId = function(_reqId) {
-    //TODOTODOTODO
     let reqObj = mainDict[_reqId];
     if (reqObj == undefined || reqObj == null)
       return null;
@@ -157,12 +140,10 @@ const ReqDict = (function() {
   return reqDict;
 })();
 
-
 // =======================
 // == VISClient Class   ==
 // == (= Core of VIAS ) ==
 // =======================
-//class VISClient {
 const VISClient = (function() {
 
   // ==================
@@ -177,10 +158,8 @@ const VISClient = (function() {
   let g_reqDict = new ReqDict();
   let connection = null;
 
-  // connection error用Cb
   let onConnectErrCb = null;
   let onDisconnectSucCb = null;
-  //var wsCloseCb = null;
 
   // =================
   // == constructor ==
@@ -188,7 +167,7 @@ const VISClient = (function() {
 
     // =================
     // == public prop ==
-    // プロパティ初期化
+    // init properties
     if (_viscOption) {
       this.host = _viscOption.host;
       this.protocol = _viscOption.protocol;
@@ -201,20 +180,17 @@ const VISClient = (function() {
   let p = visClient.prototype;
 
   p.connect = function(_sucCb, _errCb) {
-    // TODO: connect の失敗ケースはどんな場合？
+    // TODO: need to consider 'connect' error case
     if (connection != null) {
-      //既にconnectionがあるので、エラーを返す
-      let err = createErrObj(-1, 'connetion already exists','');  //TODO: 正しいエラーコードは？
+      let err = createErrObj(-1, 'connetion already exists','');  //TODO: improve error code
       setTimeout(function(){_errCb(err);},1);
       return;
     }
 
-    // WebSocket接続を確立
+    // establish WebSocket
     let url = this.protocol + this.host + ':' + this.port;
     connection = new WebSocket(url, SUBPROTOCOL);
-    // 成功したら _sucCbで通知(何を？
     connection.onopen    = (_event) => {onWsOpen   (_event, _sucCb);};
-    //connection.onclose   = (_event) =>       {onWsClose  (_event, wsCloseCb);};
     connection.onclose   = (_event) => {onWsClose  (_event);};
     connection.onmessage = (_event) => {onWsMessage(_event);}
 
@@ -224,38 +200,32 @@ const VISClient = (function() {
     //  の受け口と考えるべき。ということでよいか。
     // TODO: onerrorは何の場合に発生するのか？発生させる方法が不明。
     connection.onerror   = (_event) => {onWsError  (_event, _errCb)};
-    // onclose イベントで利用できるように、クラスメンバに登録しておく
     onConnectErrCb = _errCb;
 
   };
   p.disconnect = function(_sucCb, _errCb) {
     if (connection == null) {
-      let err = createErrObj(-1, 'connetion not exists','');  //TODO: 正しいエラーコードは？
+      let err = createErrObj(-1, 'connetion not exists','');  //TODO: improve error code
       setTimeout(function(){_errCb(err);},1);
       return;
     }
-    //wsCloseCb = _sucCb; //onclose でコールバックを呼べるようにprivateメンバに設定しておく
-    onDisconnectSucCb = _sucCb; //onclose でコールバックを呼べるようにprivateメンバに設定しておく
+    onDisconnectSucCb = _sucCb;
     connection.close();
   };
   p.get = function(_path, _sucCb, _errCb) {
     dbgLog('get: path=' + _path);
     if (connection == null || connection.readyState != WS_OPEN) {
-      // TODO: エラーを返す
-      let err = createErrObj(-1, 'connetion not exists','');  //TODO: 正しいエラーコードは？
+      let err = createErrObj(-1, 'connetion not exists','');  //TODO: improve error code
       setTimeout(function(){_errCb(err);},1);
       return;
     }
 
-    // get用JSONを作成
     let reqId = issueNewReqId();
     let req = {'action': 'get', 'path': _path, 'requestId':reqId};
 
-    // sucCb, errCb, reqIdはハッシュに登録しておく
     let obj = {'reqObj': req, 'sucCb': _sucCb, 'errCb': _errCb};
     g_reqDict.addRequest(reqId, obj);
 
-    // ws で送付
     let json_str = JSON.stringify(req);
     connection.send(json_str);
 
@@ -264,18 +234,21 @@ const VISClient = (function() {
   p.subscribe = function(_path, _sucCb, _errCb, _filter) {
     dbgLog('subscribe: path=' + _path);
     if (connection == null || connection.readyState != WS_OPEN) {
-      // TODO: エラーを返す
-      let err = createErrObj(-1, 'connetion not exists','');  //TODO: 正しいエラーコードは？
+      let err = createErrObj(-1, 'connetion not exists','');  //TODO: improve error code
       setTimeout(function(){_errCb(err);},1);
       return;
     }
 
-    // subscribe用JSONを作成
     let reqId = issueNewReqId();
-    // 同期的にsubIdを返すため、subIdを2重構造にしてみた
-    // 同期で返せる clientSide subId
-    // 非同期でVISSから送付される serverSide subId
-    // 関連付けて使用すれば困らない想定
+    // For the purpose of returning subscriptionId synchronously
+    // use two types of subscriptionId
+    // - clientSubscriptionId : this is newly added subscriptionId for convenience
+    // - serverSubscriptionId : this is real subscriptionId
+    // Why using two subId?
+    // - cliSubId is returned to UserApp instantly. UserApp does not have to wait for
+    //   VISS response to know subscriptionId.
+    // - svrSubId will be returned from VISS later and svrSubId and cliSubId is associated.
+    //   Then UserApp's callback can be called correctly when subscription notifcation arrived.
     let cliSubId = issueNewCliSubId();
 
     //TODO: filter not supported
@@ -290,39 +263,26 @@ const VISClient = (function() {
     connection.send(json_str);
     dbgLog('--: ==> ' + json_str);
 
-    // 同期的に仮のsubIdを返す
+    // return provisional subscriptionId synchronously.
     return cliSubId;
-
-    // このあとの流れ：
-    // VISSから、subscribeSuccessResponse jsonとして、serverSide subIdが届く
-    //   => clientSide subId と関連づけられるように、reqDictに格納
-    // VISSから、subscriptionNotification として、pathの値が届く
-    //   => serverSide subId付きで届くので、clientSide subIdに変換して
-    //      呼び出し元の success Callback で通知
-
   };
   p.unsubscribe = function(_cliSubId, _sucCb, _errCb) {
 
     dbgLog('unsubscribe: cliSubId=' + _cliSubId);
     if (connection == null || connection.readyState != WS_OPEN) {
-      // TODO: エラーを返す
-      let err = createErrObj(-1, 'connetion not exists','');  //TODO: 正しいエラーコードは？
+      let err = createErrObj(-1, 'connetion not exists','');  //TODO: improve error code 
       setTimeout(function(){_errCb(err);},1);
       return;
     }
 
-    let reqId = issueNewReqId(); //reqIdはunsub用に新しいものを使用
+    let reqId = issueNewReqId();
     let svrSubId = g_reqDict.convertCliSubIdToSvrSubId(_cliSubId);
     dbgLog('unsubscribe: svrSubId=' + svrSubId);
 
-    // VISS に送付する、unsubscribeRequest json を作る
     let req = {'action': 'unsubscribe', 'requestId':reqId, 'subscriptionId':svrSubId};
     let obj = {'reqObj': req, 'sucCb': _sucCb, 'errCb':_errCb,
                'cliSubId': _cliSubId, 'svrSubId': svrSubId };
-    // unsubscribe は、逆引き用の *SubIdDict に登録しない
-    // というのは、svrSubIdはすでに登録済みなので、ダブってしまうと逆引きできなくなるので
 
-    // reqDictに登録する
     g_reqDict.addRequest(reqId, obj);
     let json_str = JSON.stringify(req);
     connection.send(json_str);
@@ -333,18 +293,16 @@ const VISClient = (function() {
   p.unsubscribeAll = function(_sucCb, _errCb) {
     dbgLog('unsubscribeAll');
     if (connection == null || connection.readyState != WS_OPEN) {
-      // TODO: 正しいエラーを返す
-      let err = createErrObj(-1, 'connetion not exists','');  //TODO: 正しいエラーコードは？
+      let err = createErrObj(-1, 'connetion not exists','');  //TODO: improve error code
       setTimeout(function(){_errCb(err);},1);
       return;
     }
 
-    // VISS に送付する、unsubscribeRequest json を作る
-    let reqId = issueNewReqId(); //reqIdはunsub用に新しいものを使用
+    let reqId = issueNewReqId();
     let req = {'action': 'unsubscribeAll', 'requestId':reqId };
     let obj = {'reqObj': req, 'sucCb': _sucCb, 'errCb':_errCb,
                'cliSubId': null, 'svrSubId': null };
-    // reqDictに登録する
+
     g_reqDict.addRequest(reqId, obj);
     let json_str = JSON.stringify(req);
     connection.send(json_str);
@@ -359,12 +317,13 @@ const VISClient = (function() {
       setTimeout(function(){_errCb(err);},1);
       return;
     }
-    // set用JSONを作成
+    // create 'auth' json message
     let reqId = issueNewReqId();
     let req = {'action': 'authorize', 'tokens': _tokens, 'requestId':reqId};
     let obj = {'reqObj': req, 'sucCb': _sucCb, 'errCb': _errCb};
     g_reqDict.addRequest(reqId, obj);
-    // ws で送付
+
+    // send the json message via WebSocket
     let json_str = JSON.stringify(req);
     connection.send(json_str);
     dbgLog('--: ==> ' + json_str);
@@ -377,16 +336,15 @@ const VISClient = (function() {
       setTimeout(function(){_errCb(err);},1);
       return;
     }
-    // set用JSONを作成
+    // create 'getVSS' json message
     let reqId = issueNewReqId();
     let req = {'action': 'getVSS', 'path': _path, 'requestId':reqId};
     let obj = {'reqObj': req, 'sucCb': _sucCb, 'errCb': _errCb};
     g_reqDict.addRequest(reqId, obj);
-    // ws で送付
+    // send the json message via WebSocket
     let json_str = JSON.stringify(req);
     connection.send(json_str);
     dbgLog('--: ==> ' + json_str);
-
   };
   p.set = function(_path, _val, _sucCb, _errCb) {
     dbgLog('set: path=' + _path + ', value=' + _val);
@@ -395,12 +353,13 @@ const VISClient = (function() {
       setTimeout(function(){_errCb(err);},1);
       return;
     }
-    // set用JSONを作成
+    // create 'set' json message
     let reqId = issueNewReqId();
     let req = {'action': 'set', 'path': _path, 'value': _val, 'requestId':reqId};
     let obj = {'reqObj': req, 'sucCb': _sucCb, 'errCb': _errCb};
     g_reqDict.addRequest(reqId, obj);
-    // ws で送付
+
+    // send the json message via WebSocket
     let json_str = JSON.stringify(req);
     connection.send(json_str);
     dbgLog('--: ==> ' + json_str);
@@ -411,13 +370,11 @@ const VISClient = (function() {
 
   // ===================
   // == Event handler ==
-  // WebSocket用ハンドラ
-  //function onWsOpen(_sucCb) {
+  // handler for WebSocket
   function onWsOpen(_event, _sucCb) {
     dbgLog('onOpen');
     _sucCb('websocket connected');
   }
-  //function onWsClose(_event, _closeCb) {
   function onWsClose(_event) {
     // WebSocket closeの場合分け
     // - ws.close()による意図的なdisconnectでCloseした
@@ -445,27 +402,19 @@ const VISClient = (function() {
     err.number = code;
     err.reason = 'code:'+code+', reason:'+reason+',intentional:'+intentional;
     err.intentional = intentional;
-    //TODO: 途中！このあたりのエラー取扱いをちゃんとすること
-    //注意：closeCb は errCbとは限らない。以下となる？
-    // - 意図的なcloseはsuccess
-    // - 意図しないcloseはerror
+    //TODO: need to improve error handling
     if (intentional == true) {
       if (onDisconnectSucCb != null) {
-        // disconnect が成功してcloseした
         onDisconnectSucCb('websocket disconnected: code:'+code
                          +', reason:'+reason+',intentional:'+intentional);
       } else {
-        // 理由不明で、wasClean==true でcloseした
         onConnectErrCb(err);
       }
     } else {
-      // 理由不明で、wasClean==false でcloseした
       onConnectErrCb(err);
     }
 
-    onDisconnectSucCb = null;  //TODO これで、onDisconnectSucCbがnullクリアできるか？
-    // connection closeされたら、登録したConnectErrCbもクリアする。
-    // 次の connect 時に新たに登録されるので
+    onDisconnectSucCb = null;
     onConnectErrCb = null;
     connection = null;
   }
@@ -474,7 +423,6 @@ const VISClient = (function() {
     handleWsMessage(_event);
   }
   function onWsError(_event, _errCb) {
-    //TODO: how to get error detail?
     dbgLog('onError');
     _errCb('error occurred.');
   }
@@ -483,7 +431,6 @@ const VISClient = (function() {
   // == WS message handler ==
 
   // Main process to handle message from WebSocket
-  //TODO: remove this?
   function handleWsMessage(_event) {
     dbgLog('handleWsMessage: event.data='+_event.data);
     let msg;
@@ -501,7 +448,6 @@ const VISClient = (function() {
       reqId = msg.requestId;
       reqDictItem = g_reqDict.getRequestByReqId(reqId);
     } else if (msg.subscriptionId != undefined) {
-      //reqIdなし、subIdあり＝subscribe notification の場合
       svrSubId = msg.subscriptionId;
       reqDictItem = g_reqDict.getRequestBySvrSubId(svrSubId);
     }
@@ -516,7 +462,6 @@ const VISClient = (function() {
     if (action === 'get') {
       if (isGetSuccessResponse(msg)) {
         dbgLog('Get: response success');
-        // get のsuccess では value のみ返す
         sucCb(msg.value);
 
       } else if (isGetErrorResponse(msg)) {
@@ -528,10 +473,8 @@ const VISClient = (function() {
 
     // case of 'set'
     } else if (action === 'set') {
-      //TODO:
       if (isSetSuccessResponse(msg)) {
         dbgLog('Set: response success');
-        // get のsuccess では value のみ返す
         sucCb();
 
       } else if (isSetErrorResponse(msg)) {
@@ -542,9 +485,7 @@ const VISClient = (function() {
       g_reqDict.deleteRequest(reqId);
 
     } else if (action === 'subscribe') {
-      // subId 通知の場合
       if (isSubscribeSuccessResponse(msg)) {
-        // VISS発行のsubId を Dictに格納する
         g_reqDict.addSvrSubId(msg.requestId, msg.subscriptionId);
 
       } else if (isSubscribeErrorResponse(msg)) {
@@ -552,34 +493,20 @@ const VISClient = (function() {
         errCb(msg.error.number);
         g_reqDict.deleteRequest(msg.requestId);
 
-      // value 通知の場合
       } else if (isSubscriptionNotification(msg)) {
-        // case of subscribeNotification
-
-        // callbackで通知
         dbgLog('Subscribe: notification success: val= ' + msg.value);
         sucCb(msg.value);
-
       } else if (isSubscriptionNotificationError(msg)) {
-        // noting to do special here. continue subscribe.
-        // callbackで通知
         dbgLog('Subscribe: notification fail' + msg.error.number);
         errCb(msg.error);
-
       }
 
-    // TODO: subscriptionNotification は action=='subscription' になったらしい
     } else if (action === 'subscription') {
-      //       VISS は未対応なので、まだ使わない。
+      // TODO: 'subscription' is not supported yet
 
     } else if (action === 'unsubscribe') {
       dbgLog('WsMsg:unSubscribe: received');
 
-      // TODO:
-      // unsubscribe responseをVISSから受け取った場合
-
-      // 失敗ケース
-      //  unsub request を reqDict から削除
       if (msg.error != undefined) {
         dbgLog('WsMsg:unSubscribe: fail: err='+ msg.error.number);
         // unsubscribe failed
@@ -587,16 +514,13 @@ const VISClient = (function() {
         g_reqDict.deleteRequest(reqId);
         errCb(msg.error);
 
-      // 成功ケース
-      //  sub request を reqDictから削除
-      //  unsub request を reqDict から削除
       } else {
         dbgLog('WsMsg:unSubscribe: success: svrSubId='+ msg.subscriptionId);
         // unsubscribe success
         // - delete subscribe request from requestTable
         // - delete unsubscribe request from requestTable
-        let targ_svrSubId = msg.subscriptionId; //unsub対象のsubscribeのsubId
-        let targ_reqId = g_reqDict.convertSvrSubIdToReqId(targ_svrSubId); //subscribeのreqId
+        let targ_svrSubId = msg.subscriptionId;
+        let targ_reqId = g_reqDict.convertSvrSubIdToReqId(targ_svrSubId); // reqId of subscribe
         g_reqDict.deleteRequest(targ_reqId); // delete subscribe's entry in reqTable
         g_reqDict.deleteRequest(reqId);      // delete unsub's entry in reqTable
         sucCb();
@@ -615,20 +539,7 @@ const VISClient = (function() {
 
       } else {
         dbgLog('WsMsg:unSubscribeAll: success: svrSubId='+ msg.subscriptionId);
-
-        //var targ_svrSubId = msg.subscriptionId; //unsub対象のsubscribeのsubId
-        //var targ_reqId = g_reqDict.convertSvrSubIdToReqId(targ_svrSubId); //subscribeのreqId
-        //g_reqDict.deleteRequest(targ_reqId); // delete subscribe's entry in reqTable
-
-        // 成功ケース
-        // すべてのsubscribeエントリを、g_reqDictから消去する
-        // - すべての cliSubIdDict エントリに対応するreqIdを取得
-        // - reqId のエントリを mainDictから削除
-        // - svrSubIdDicについても同じことを行う(ただし、mainDictからすべて削除済みのはず)
-        // - cliSubIdDictと、svrSubIdDictを空にする
-
-        g_reqDict.deleteAllSubscription();
-
+        g_reqDict.deleteAllSubscription();   // delete all subscibe entry
         g_reqDict.deleteRequest(reqId);      // delete unsub's entry in reqTable
         sucCb();
       }
@@ -795,6 +706,18 @@ const VISClient = (function() {
 
   // ======================
   // == Utility function ==
+  function uuid4() {
+    let uuid = '', i, random;
+    for (i = 0; i < 32; i++) {
+      random = Math.random() * 16 | 0;
+
+      if (i == 8 || i == 12 || i == 16 || i == 20) {
+        uuid += '-';
+      }
+      uuid += (i == 12 ? 4 : (i == 16 ? (random & 3 | 8) : random)).toString(16);
+    }
+    return uuid;
+  }
   function issueNewReqId() {
     return 'reqid-' + uuid4();
   }
