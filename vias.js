@@ -470,7 +470,8 @@ const VISClient = (function() {
     if (action === 'get') {
       if (isGetSuccessResponse(msg)) {
         dbgLog('Get: response success');
-        sucCb(msg.value);
+        let retVal = {'value': msg.value, 'timestamp': msg.timestamp};
+        sucCb(retVal);
 
       } else if (isGetErrorResponse(msg)) {
         dbgLog('Get: response fail');
@@ -503,8 +504,8 @@ const VISClient = (function() {
 
       } else if (isSubscriptionNotification(msg)) {
         dbgLog('Subscribe: notification success: val= ' + msg.value);
-        sucCb(msg.value);
-
+        let retVal = {'value': msg.value, 'timestamp': msg.timestamp};
+        sucCb(retVal);
       } else if (isSubscriptionNotificationError(msg)) {
         dbgLog('Subscribe: notification fail' + msg.error.number);
         errCb(msg.error);

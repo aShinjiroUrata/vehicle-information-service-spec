@@ -108,7 +108,7 @@ function doGetSpeed() {
   // get method test
   vias.get(VSS_SPEED,
     function(_val) {
-      console.log(`get speed:success: val= ${_val}`);
+      console.log(`get speed:success: val= ${_val.value}, ts= ${_val.timestamp}`);
     },
     function(_err) {
       console.error(`get speed:failure: err= ${_err.number}`);
@@ -126,7 +126,7 @@ function doSubscribeSpeed() {
   var refval = {};
   refval.path = VSS_SPEED;
   refval.subId = subId_speed;
-  refval.sucCb = function(_val) { console.log(`subscribe speed: success: val= ${_val}`); };
+  refval.sucCb = function(_val) { console.log(`subscribe speed: success: val= ${_val.value}, ts=${_val.timestamp}`); };
   refval.errCb = function(_err) { console.error(`subscribe speed: failure: err= ${_err.number}`); };
 
   doSubscribe(refval);
@@ -136,7 +136,7 @@ function doSubscribeRPM() {
   var refval = {};
   refval.path = VSS_RPM;
   refval.subId = subId_RPM;
-  refval.sucCb = function(_val) { console.log(`subscribe RPM: success: val= ${_val}`); };
+  refval.sucCb = function(_val) { console.log(`subscribe RPM: success: val= ${_val.value}, ts=${_val.timestamp}`); };
   refval.errCb = function(_err) { console.error(`subscribe RPM: failure: err= ${_err.number}`); };
 
   doSubscribe(refval);
@@ -204,7 +204,7 @@ function doGetDoorlock() {
   // get method test
   vias.get(VSS_DOORLOCK,
     function(_val) {
-      console.log(`get doorlock:success: val= ${_val}`);
+      console.log(`get doorlock:success: val= ${_val.value}, ts= ${_val.timestamp}`);
     },
     function(_err) {
       console.error(`get doorlock:failure: err= ${_err.number}`);
