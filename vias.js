@@ -1,16 +1,8 @@
+// Copyright (c) 2018 ACCESS CO., LTD. All rights reserved.
+//
 // ========================================
 // VIAS proto
 // ========================================
-
-// シンプルなコンストラクタとして作る
-// ES6 class で作成の予定だったが、その場合
-// private property/method の実現方式のbest practiceが
-// 不明確のため、ES5の旧式のclass作成方式を使用した
-// private な property は特に作らない。当面は。
-// TODO: と思ったが、一般に使ってもらう lib とするには、
-// 余計なものを隠蔽することが必要
-
-// ==============================
 
 // == Request Dictionary Class ==
 // ##define class in conventional method
