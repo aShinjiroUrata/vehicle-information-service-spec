@@ -502,11 +502,12 @@ var g_extV2CDataSrc = {
 ,'DriveTrain.Tire.RearLeft.Pressure'    :'Signal.Chassis.Axle.Row2.Wheel.Left.Tire.Pressure'
 ,'DriveTrain.Tire.RearRight.Pressure'   :'Signal.Chassis.Axle.Row2.Wheel.Right.Tire.Pressure'
 
-,'Event.Event1'    :'Private.V2C.Events.Event1'
-,'Event.Event2'    :'Private.V2C.Events.Event2'
-,'Event.Event3'    :'Private.V2C.Events.Event3'
-,'Event.Event4'    :'Private.V2C.Events.Event4'
-,'Event.Event5'    :'Private.V2C.Events.Event5'
+,'DriveTrain.ADAS.ABS':'Signal.ADAS.ABS.IsEngaged'
+,'Event.Lane'         :'Private.V2C.Events.Lane'
+,'Event.RedLight'     :'Private.V2C.Events.RedLight'
+,'Event.Tire'         :'Private.V2C.Events.Tire'
+,'Event.Pedestrian'   :'Private.V2C.Events.Pedestrian'
+,'Event.Accident'     :'Private.V2C.Events.Accident'
 
 ,'Emotion.Calm'          : 'Private.V2C.Emotion.Calm'
 ,'Emotion.Angry'         : 'Private.V2C.Emotion.Angry'
@@ -515,6 +516,7 @@ var g_extV2CDataSrc = {
 ,'Emotion.Excite'        : 'Private.V2C.Emotion.Excite'
 ,'Emotion.Level'         : 'Private.V2C.Emotion.Level'
 ,'Emotion.PrimaryEmotion': 'Private.V2C.Emotion.PrimaryEmotion'
+,'Emotion.Face.Picture'  : 'Private.V2C.Emotion.Face.Picture'
 
   },
 
