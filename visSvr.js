@@ -183,14 +183,13 @@ var g_extMockDataSrc = (function() {
       });
     },
 
-    //send set request to mockDataSrc
     sendSetRequest: function(obj, _reqId, _sessId) {
-      if (m_conn != null) {
+      if (connV2cServer != null) {
         var dataSrcReqId = this.createDataSrcReqId();
         var sendObj = this.createExtMockSvrSetRequestJson(obj, dataSrcReqId);
         this.addDataSrcReqHash(dataSrcReqId, _reqId, _sessId);
         //printLog(LOG_DEFAULT,"  :sendObj="+JSON.stringify(sendObj));
-        m_conn.sendUTF(JSON.stringify(sendObj));
+        connV2cServer.send(JSON.stringify(sendObj));
       }
     },
     //send VSS json(full) request to mockDataSrc
@@ -206,15 +205,18 @@ var g_extMockDataSrc = (function() {
 
     createDataSrcReqId: function() {
       var uniq = getSemiUniqueId();
-      return "datasrcreqid-"+uniq;
+      return "ble-"+uniq;
     },
 
     createExtMockSvrSetRequestJson: function(_obj, _dataSrcReqId) {
-      var retObj =  {"action": "set", "data":
-                      {"path": _obj.path,
-                       "value": _obj.value,
-                       "requestId":_dataSrcReqId}
-                    };
+      var retObj =  {
+        cmd: 'set',
+        reqId: _dataSrcReqId,
+        arg: {
+          path: g_extV2CDataSrc.geniviToLocalPath[_obj.path],
+          value: _obj.value,
+        },
+      };
 
       return retObj;
     },
@@ -426,8 +428,6 @@ if (dataSrc === EXT_SIP_SERVER) {
 // == dataSrc connection: V2C websocket client ==
 // ==============================================
 // #use socket.io by requirement of Hackathon server
-const EXT_V2C_IP = '127.0.0.1';
-const EXT_V2C_PORT = '8089';
 var g_extV2CDataSrc = {
   // roomID: EXT_SIPSVR_ROOMID,  // def in 'svr_config.js'
   svrUrl: "ws://" + EXT_SIPSVR_IP + ":" + EXT_SIPSVR_PORT,  //def in 'svr_config.js'
@@ -550,6 +550,27 @@ var g_extV2CDataSrc = {
     'Emotion.Face.Picture':   'Private.V2C.Emotion.Face.Picture',
   },
 
+  // for v2c set command
+  geniviToLocalPath : {
+    'Signal.Drivetrain.FuelSystem.Level':                  'RunningStatus.Fuel.Level',
+    'Signal.Drivetrain.BatteryManagement.BatteryCapacity': 'RunningStatus.Battery.Capacity',
+    'Signal.Cabin.Door.Row1.Left.IsOpen':                  'Body.Door.FrontLeft.IsOpen',
+    'Signal.Cabin.Door.Row1.Left.IsLocked':                'Body.Door.FrontLeft.IsLocked',
+    'Signal.Cabin.Door.Row1.Left.Window.Position':         'Body.Door.FrontLeft.WindowPosition',
+    'Signal.Body.Mirrors.Left.Pan':                        'Body.Door.FrontLeft.IsMirrorOpen',
+    'Signal.Body.Mirrors.Right.Pan':                       'Body.Door.FrontRight.IsMirrorOpen',
+    'Signal.Body.Trunk.IsOpen':                            'Body.Trunk.IsOpen',
+    'Signal.Body.Lights.IsLowBeamOn':                      'Body.Light.IsLowBeamOn',
+    'Signal.Body.Lights.IsHighBeamOn':                     'Body.Light.IsHighBeamOn',
+    'Signal.Body.Windshield.Front.Wiping.Status':          'Body.Wiper.Front.Status',
+    'Signal.Cabin.HVAC.Row1.Left.Temperature':             'Cabin.HVAC.FrontLeft.Temperature',
+    'Signal.Cabin.Sunroof.Position':                       'Cabin.Sunroof.Position',
+    'Signal.Chassis.Axle.Row1.Wheel.Left.Tire.Pressure':   'DriveTrain.Tire.FrontLeft.Pressure',
+    'Signal.Chassis.Axle.Row1.Wheel.Right.Tire.Pressure':  'DriveTrain.Tire.FrontRight.Pressure',
+    'Signal.Chassis.Axle.Row2.Wheel.Left.Tire.Pressure':   'DriveTrain.Tire.RearLeft.Pressure',
+    'Signal.Chassis.Axle.Row2.Wheel.Right.Tire.Pressure':  'DriveTrain.Tire.RearRight.Pressure',
+  },
+
   // V2C JSON obj を json objのArrayに変換する
   convertV2CObjToV2CArry: (_obj) => {
     //console.log('convertV2CObjToV2cArry: ');
@@ -575,6 +596,10 @@ var g_extV2CDataSrc = {
   },
 
   convertV2CFormatToVSS: (_v2cObj) => {
+    if(_v2cObj.cmd === 'set'){
+      return JSON.stringify(_v2cObj);
+    }
+
     //console.log('convertV2CFormatToVSS: ');
     let vssArry = [];
     //まず、v2cObjをJSONから配列形式に変換
@@ -609,6 +634,7 @@ var g_extV2CDataSrc = {
   },
 }
 
+let connV2cServer = null;
 if (dataSrc === EXT_V2C_CLIENT) {
   // websocket-node で websocket serverを立てる
   // その後、vehicledata が送られてきたら
@@ -646,9 +672,9 @@ if (dataSrc === EXT_V2C_CLIENT) {
       return;
     }
 
-    //const conn = req.accept('echo-protocol', req.origin); // subproto使う場合
-    const conn = req.accept();
-    conn.on('message', function(msg) {
+    //const connV2cServer = req.accept('echo-protocol', req.origin); // subproto使う場合
+    connV2cServer = req.accept();
+    connV2cServer.on('message', function(msg) {
       //console.log('on message');
       if (msg.type === 'utf8') {
         //console.log('Received Msg: ' + msg.utf8Data);
@@ -665,8 +691,9 @@ if (dataSrc === EXT_V2C_CLIENT) {
         }
       }
     });
-    conn.on('close', function(reasonCode, desc) {
-      console.log('Peer ' + conn.remoteAddress + ' disconnected');
+    connV2cServer.on('close', function(reasonCode, desc) {
+      console.log('Peer ' + connV2cServer.remoteAddress + ' disconnected');
+      connV2cServer = null;
     });
   });
 }
@@ -789,10 +816,10 @@ function AuthHash() {
   //   basically, if 'authorize' success, the value of 'get','set','subscribe' should set to 'true'
   //   (this access-control impl is adhoc and easy example.
   this.hash = {};
-  this.hash['Signal.Cabin.Door.Row1.Right.IsLocked'] = {'get':false, 'set':false, 'subscribe':false};
-  this.hash['Signal.Cabin.Door.Row1.Left.IsLocked']  = {'get':false, 'set':false, 'subscribe':false};
-  this.hash['Signal.Cabin.HVAC.Row1.RightTemperature'] = {'get':false, 'set':false, 'subscribe':false};
-  this.hash['Signal.Cabin.HVAC.Row1.LeftTemperature']  = {'get':false, 'set':false, 'subscribe':false};
+  this.hash['Signal.Cabin.Door.Row1.Right.IsLocked'] = {'get':false, 'set':true, 'subscribe':false};
+  this.hash['Signal.Cabin.Door.Row1.Left.IsLocked']  = {'get':false, 'set':true, 'subscribe':false};
+  this.hash['Signal.Cabin.HVAC.Row1.RightTemperature'] = {'get':false, 'set':true, 'subscribe':false};
+  this.hash['Signal.Cabin.HVAC.Row1.LeftTemperature']  = {'get':false, 'set':true, 'subscribe':false};
 
 }
 AuthHash.prototype.grantAll = function() {
@@ -989,8 +1016,8 @@ function dataReceiveHandler(message) {
   var vssObj  = null;
   if (obj.action === "data") {
     dataObj = obj.data;
-  } else if (obj.action === "set") {
-    setObj = obj.data; //TODO: sync with acs vehicle data I/F document
+  } else if (obj.cmd === "set") {
+    setObj = obj; //TODO: sync with acs vehicle data I/F document
   } else if (obj.action === "getMetadata") {
     vssObj = obj.data;
   } else {
@@ -1011,7 +1038,7 @@ function dataReceiveHandler(message) {
     if (vssObj) {
       _dataSrcReqId = vssObj.requestId;
     } else {
-      _dataSrcReqId = setObj.requestId;
+      _dataSrcReqId = setObj.reqId;
     }
 
     do { // for exitting by 'break'
@@ -1048,7 +1075,7 @@ function dataReceiveHandler(message) {
         if (setObj.error != undefined) {
           retObj = createSetErrorResponse(_reqObj.requestId, setObj.error, setObj.timestamp);
         } else {
-          retObj = createSetSuccessResponse(_reqObj.requestId, setObj.timestamp);
+          retObj = createSetSuccessResponse(_reqObj.requestId, setObj.arg.timestamp);
         }
         printLog(LOG_VERBOSE,"  :set response="+JSON.stringify(retObj));
       }
