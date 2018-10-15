@@ -586,7 +586,7 @@ var g_extV2CDataSrc = {
     }
     function findLeaf(_key, _value, _path) {
       //console.log('findLeaf: key = '+_key);
-      if (typeof(_value) !== 'object') {
+      if (typeof(_value) !== 'object' || Array.isArray(_value)) {
         // not objectならleaf(末端)と判断する
         let item = {path: _path, value: _value};
         resArry.push(item);
