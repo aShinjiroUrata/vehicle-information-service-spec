@@ -9,6 +9,7 @@
   "dependencies": {
     "fs": "^0.0.1-security",
     "http": "^0.0.0",
+    "lodash": "^4.17.11",
     "socket.io": "^2.1.1",
     "socket.io-client": "^2.1.1",
     "websocket": "^1.0.26",

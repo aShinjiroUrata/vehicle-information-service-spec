@@ -11,6 +11,7 @@
 "use strict"
 
 // == Server IP and Port Number ==
+var _ = require('lodash');
 var svr_config = require('./svr_config');
 var VISS_IP = svr_config.VISS_IP_PRV;
 var VISS_PORT = svr_config.VISS_PORT;
@@ -942,6 +943,7 @@ wssvr.on('connection', function(ws) {
       var path = obj.path;
       var action = obj.action;
       var subId = getUniqueSubId();
+      var filters = obj.filters;
 
       var ret = _reqTable.addReqToTable(obj, subId, null);
       var timestamp = new Date().getTime().toString(10);
@@ -1131,8 +1133,11 @@ function dataReceiveHandler(message) {
             // send back 'subscribeSuccessResponse'
             retObj = createSubscriptionNotificationJson(reqObj.subscriptionId, matchObj.value, matchObj.timestamp);
 
-            if (_ws != null)
+            if ((_ws != null) && shouldPassFilters(reqObj, matchObj)) {
               _ws.send(JSON.stringify(retObj));
+              reqObj.lastVal = matchObj.value;
+              reqObj.lastTimestamp = matchObj.timestamp;
+            }
           } else {
             // nothing to do
           }
@@ -1140,6 +1145,38 @@ function dataReceiveHandler(message) {
       }
     }
   }
+}
+
+function shouldPassFilters(reqObj, matchObj) {
+  const rangeAbove = _.get(reqObj.filters, 'range.above');
+  if (!_.isUndefined(rangeAbove)) {
+    if (matchObj.value <= rangeAbove) {
+      return false;
+    }
+  }
+
+  const rangeBelow = _.get(reqObj.filters, 'range.below');
+  if (!_.isUndefined(rangeBelow)) {
+    if (matchObj.value >= rangeBelow) {
+      return false;
+    }
+  }
+
+  const minChange = _.get(reqObj.filters, 'minChange');
+  if (!_.isUndefined(minChange)) {
+    if (Math.abs(matchObj.value - reqObj.lastVal) < minChange) {
+      return false;
+    }
+  }
+
+  const interval = _.get(reqObj.filters, 'interval');
+  if (!_.isUndefined(interval)) {
+    if ((matchObj.timestamp - reqObj.lastTimestamp) < interval) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 // _dataObj: mockDataSrcからのJson Obj
