@@ -63,6 +63,10 @@ var ERR_DEVICE_UNKNOWN   = '403';
 // May be clock time is easy to use. If period, need to memorize start time.
 var AUTHORIZE_TTL = 30; //sec. mock value
 
+const FILTER_PASS = 0;
+const FILTER_DELAY = 1;
+const FILTER_FILTERED = 2;
+
 // ===========================
 // == Start WebSocketServer ==
 // ===========================
@@ -1133,10 +1137,45 @@ function dataReceiveHandler(message) {
             // send back 'subscribeSuccessResponse'
             retObj = createSubscriptionNotificationJson(reqObj.subscriptionId, matchObj.value, matchObj.timestamp);
 
-            if ((_ws != null) && shouldPassFilters(reqObj, matchObj)) {
-              _ws.send(JSON.stringify(retObj));
-              reqObj.lastVal = matchObj.value;
-              reqObj.lastTimestamp = matchObj.timestamp;
+            const ret = shouldPassFilters(reqObj, matchObj);
+            switch (ret.action) {
+            case FILTER_PASS:
+              if (_ws != null && !reqObj.waiting) {
+                _ws.send(JSON.stringify(retObj));
+                reqObj.lastVal = retObj.value;
+                reqObj.lastValTimestamp = retObj.timestamp;
+                reqObj.lastSendTimestamp = new Date().getTime();
+              }
+              break;
+            case FILTER_DELAY:
+              if ( !reqObj.waiting ) {
+                reqObj.waiting = true;
+                setTimeout(function() {
+                  if (_ws != null) {
+                    if (reqObj.updatedVal !== null) {
+                      retObj.value = reqObj.updatedVal;
+                      retObj.timestamp = reqObj.updatedValTimestamp;
+                      reqObj.updatedVal = null;
+                    }
+                    try {
+                      _ws.send(JSON.stringify(retObj));
+                    } catch (err) {
+                      console.log('send failed: connection may be closed.');
+                    }
+                    reqObj.lastVal = retObj.value;
+                    reqObj.lastValTimestamp = retObj.timestamp;
+                    reqObj.lastSendTimestamp = new Date().getTime();
+                    reqObj.waiting = false;
+                  }
+                }, ret.waitTime);
+              } else {
+                reqObj.updatedVal = matchObj.value;
+                reqObj.updatedValTimestamp = matchObj.timestamp;
+              }
+              break;
+            case FILTER_FILTERED:
+            default:
+              break;
             }
           } else {
             // nothing to do
@@ -1149,34 +1188,47 @@ function dataReceiveHandler(message) {
 
 function shouldPassFilters(reqObj, matchObj) {
   const rangeAbove = _.get(reqObj.filters, 'range.above');
-  if (!_.isUndefined(rangeAbove)) {
-    if (matchObj.value <= rangeAbove) {
-      return false;
-    }
-  }
-
   const rangeBelow = _.get(reqObj.filters, 'range.below');
-  if (!_.isUndefined(rangeBelow)) {
-    if (matchObj.value >= rangeBelow) {
-      return false;
+
+  if (!_.isUndefined(rangeAbove) && !_.isUndefined(rangeBelow)) {
+    if (rangeAbove < rangeBelow) {
+      if ((matchObj.value <= rangeAbove) || (matchObj.value >= rangeBelow)) {
+        return {action: FILTER_FILTERED};
+      }
+    } else {
+      if ((matchObj.value >= rangeBelow) && (matchObj.value <= rangeAbove)) {
+        return {action: FILTER_FILTERED};
+      }
+    }
+  } else {
+    if (!_.isUndefined(rangeAbove)) {
+      if (matchObj.value <= rangeAbove) {
+        return {action: FILTER_FILTERED};
+      }
+    }
+    if (!_.isUndefined(rangeBelow)) {
+      if (matchObj.value >= rangeBelow) {
+        return {action: FILTER_FILTERED};
+      }
     }
   }
 
   const minChange = _.get(reqObj.filters, 'minChange');
   if (!_.isUndefined(minChange)) {
     if (Math.abs(matchObj.value - reqObj.lastVal) < minChange) {
-      return false;
+      return {action: FILTER_FILTERED};
     }
   }
 
   const interval = _.get(reqObj.filters, 'interval');
   if (!_.isUndefined(interval)) {
-    if ((matchObj.timestamp - reqObj.lastTimestamp) < interval) {
-      return false;
+    const elapsed = new Date().getTime() - reqObj.lastSendTimestamp;
+    if (elapsed < interval) {
+      return {action: FILTER_DELAY, waitTime: (interval - elapsed)};
     }
   }
 
-  return true;
+  return {action: FILTER_PASS};
 }
 
 // _dataObj: mockDataSrcからのJson Obj
