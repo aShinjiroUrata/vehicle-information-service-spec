@@ -1140,17 +1140,24 @@ function dataReceiveHandler(message) {
             const ret = shouldPassFilters(reqObj, matchObj);
             switch (ret.action) {
             case FILTER_PASS:
-              if (_ws != null && !reqObj.waiting) {
+              if (_ws != null) {
                 _ws.send(JSON.stringify(retObj));
                 reqObj.lastVal = retObj.value;
                 reqObj.lastValTimestamp = retObj.timestamp;
                 reqObj.lastSendTimestamp = new Date().getTime();
+                if (reqObj.waitId) {
+                  clearTimeout(reqObj.waitId);
+                  reqObj.waitId = null;
+                  reqObj.waiting = false;
+                }
               }
               break;
             case FILTER_DELAY:
               if ( !reqObj.waiting ) {
                 reqObj.waiting = true;
-                setTimeout(function() {
+                reqObj.updatedVal = matchObj.value;
+                reqObj.updatedValTimestamp = matchObj.timestamp;
+                reqObj.waitId = setTimeout(function() {
                   if (_ws != null) {
                     if (reqObj.updatedVal !== null) {
                       retObj.value = reqObj.updatedVal;
@@ -1187,9 +1194,18 @@ function dataReceiveHandler(message) {
 }
 
 function shouldPassFilters(reqObj, matchObj) {
+  const onChange = _.get(reqObj.filters, 'onChange');
+  const interval = _.get(reqObj.filters, 'interval');
+  if (!_.isUndefined(onChange) && onChange) {
+    if (matchObj.value === reqObj.lastVal) {
+      if (_.isUndefined(interval)) {
+        return {action: FILTER_FILTERED};
+      }
+    }
+  }
+
   const rangeAbove = _.get(reqObj.filters, 'range.above');
   const rangeBelow = _.get(reqObj.filters, 'range.below');
-
   if (!_.isUndefined(rangeAbove) && !_.isUndefined(rangeBelow)) {
     if (rangeAbove < rangeBelow) {
       if ((matchObj.value <= rangeAbove) || (matchObj.value >= rangeBelow)) {
@@ -1220,11 +1236,12 @@ function shouldPassFilters(reqObj, matchObj) {
     }
   }
 
-  const interval = _.get(reqObj.filters, 'interval');
   if (!_.isUndefined(interval)) {
     const elapsed = new Date().getTime() - reqObj.lastSendTimestamp;
     if (elapsed < interval) {
-      return {action: FILTER_DELAY, waitTime: (interval - elapsed)};
+      if ((matchObj.value === reqObj.lastVal) || (!_.isUndefined(onChange) && !onChange)) {
+        return {action: FILTER_DELAY, waitTime: (interval - elapsed)};
+      }
     }
   }
 
@@ -1538,4 +1555,3 @@ function createAuthorizeErrorResponse(reqId, err) {
   var retObj = {"action": "authorize", "requestId":reqId, "error":err};
   return retObj;
 }
-
