@@ -12,10 +12,14 @@
 
 // == Server IP and Port Number ==
 var _ = require('lodash');
+var msgpack = require('msgpack-lite');
 var svr_config = require('./svr_config');
 var VISS_IP = svr_config.VISS_IP_PRV;
 var VISS_PORT = svr_config.VISS_PORT;
-var SUBPROTOCOL = "wvss1.0";
+var SUBPROTOCOLS = [
+  'wvss1.0_binary',
+  'wvss1.0',  // default subprotocol
+];
 
 var TOKEN_VALID = svr_config.TOKEN_VALID;
 var TOKEN_INVALID = svr_config.TOKEN_INVALID;
@@ -71,18 +75,20 @@ const FILTER_FILTERED = 2;
 // == Start WebSocketServer ==
 // ===========================
 
-// for sub-protocol support
-function selectProtocols(protocols) {
-  printLog(LOG_DEFAULT, "  :incomming sub-protocol = " + protocols);
-  printLog(LOG_DEFAULT, "  :granting sub-protocol = " + SUBPROTOCOL);
-  return SUBPROTOCOL;
-};
-
 var WebSocketServer = require('ws').Server;
 var wssvr = new WebSocketServer({
-  host : VISS_IP,
-  port : VISS_PORT,
-  handleProtocols : selectProtocols 
+  host: VISS_IP,
+  port: VISS_PORT,
+  handleProtocols: function(protocols) {
+    printLog(LOG_DEFAULT, "  :incomming sub-protocol = " + protocols);
+    for (let i=0; i<SUBPROTOCOLS.length; i++) {
+      if (protocols.indexOf(SUBPROTOCOLS[i]) >= 0) {
+        printLog(LOG_DEFAULT, "  :granting sub-protocol = " + SUBPROTOCOLS[i]);
+        return SUBPROTOCOLS[i];
+      }
+    }
+    return SUBPROTOCOLS[SUBPROTOCOLS.length-1];
+  }
 });
 
 // =========================================
@@ -868,14 +874,18 @@ wssvr.on('connection', function(ws) {
   // for connecting to outside data source
   ws.on('message', function(message) {
     var obj;
-    try {
-      obj = JSON.parse(message);
-    } catch (e) {
-      printLog(LOG_QUIET,"  :received irregular Json messaged. ignored. msg = "+message);
-      printLog(LOG_QUIET,"  :Error = "+e);
-      return;
+    if (ws.protocol === 'wvss1.0_binary') {
+      obj = msgpack.decode(message);
+    } else {
+      try {
+        obj = JSON.parse(message);
+      } catch (e) {
+        printLog(LOG_QUIET,"  :received irregular Json messaged. ignored. msg = "+message);
+        printLog(LOG_QUIET,"  :Error = "+e);
+        return;
+      }
     }
-    printLog(LOG_DEFAULT,"  :ws.on:message: obj= " + message);
+    printLog(LOG_DEFAULT,"  :ws.on:message: obj= " + JSON.stringify(obj));
 
     // NOTE: assuming 1 message contains only 1 method.
     // for 'get'
@@ -903,7 +913,7 @@ wssvr.on('connection', function(ws) {
         var ts = getUnixEpochTimestamp();
         var err = ERR_USER_FORBIDDEN; //TODO better to use detailed actual reason
         resObj = createSetErrorResponse(reqId, err, ts);
-        ws.send(JSON.stringify(resObj));
+        sendInProtocol(ws, resObj);
       } else {
         // TODO: for now support extMockDataSrc only. support other dataSrc when needed.
         g_extMockDataSrc.sendSetRequest(obj, reqId, _sessId);
@@ -927,7 +937,7 @@ wssvr.on('connection', function(ws) {
         printLog(LOG_DEFAULT,"  :authorize token check failed.");
         resObj = createAuthorizeErrorResponse(reqId, err);
       }
-      ws.send(JSON.stringify(resObj));
+      sendInProtocol(ws, resObj);
 
     } else if (obj.action === "getMetadata") {
       // - VSS json is retrieved from dataSrc
@@ -959,7 +969,7 @@ wssvr.on('connection', function(ws) {
         printLog(LOG_DEFAULT, "  :subscribe started. reqId=" + reqId + ", subId=" + subId + ", path=" + path);
         resObj = createSubscribeSuccessResponse(action, reqId, subId, timestamp);
       }
-      ws.send(JSON.stringify(resObj));
+      sendInProtocol(ws, resObj);
 
     } else if (obj.action === "unsubscribe") {
       var reqId = obj.requestId; // unsub requestのreqId
@@ -977,7 +987,7 @@ wssvr.on('connection', function(ws) {
         var err = -1; //TODO: select correct error value
         resObj = createUnsubscribeErrorResponse(obj.action, reqId, targ_subId, err, timestamp);
       }
-      ws.send(JSON.stringify(resObj));
+      sendInProtocol(ws, resObj);
 
     } else if (obj.action === "unsubscribeAll") {
       for (var i in _reqTable.subIdHash) {
@@ -989,7 +999,7 @@ wssvr.on('connection', function(ws) {
 
       var timestamp = new Date().getTime().toString(10);
       resObj = createUnsubscribeAllSuccessResponse(obj.action, obj.requestId, timestamp);
-      ws.send(JSON.stringify(resObj));
+      sendInProtocol(ws, resObj);
 
     } else {
       //Do nothing
@@ -1094,7 +1104,7 @@ function dataReceiveHandler(message) {
 
       if (_ws != null) {
         // send back VSS json to client
-        _ws.send(JSON.stringify(retObj));
+        sendInProtocol(_ws, retObj);
       }
       // delete this request from queue
       _reqTable.delReqByReqId(_reqObj.requestId);
@@ -1129,7 +1139,7 @@ function dataReceiveHandler(message) {
             // send back 'getSuccessResponse'
             retObj = createGetSuccessResponse(reqObj.requestId, matchObj.value, matchObj.timestamp);
             if (_ws != null)
-              _ws.send(JSON.stringify(retObj));
+              sendInProtocol(_ws, retObj);
             // delete this request from queue
             _reqTable.delReqByReqId(reqObj.requestId);
 
@@ -1141,7 +1151,7 @@ function dataReceiveHandler(message) {
             switch (ret.action) {
             case FILTER_PASS:
               if (_ws != null) {
-                _ws.send(JSON.stringify(retObj));
+                sendInProtocol(_ws, retObj);
                 reqObj.lastVal = retObj.value;
                 reqObj.lastValTimestamp = retObj.timestamp;
                 reqObj.lastSendTimestamp = new Date().getTime();
@@ -1165,7 +1175,7 @@ function dataReceiveHandler(message) {
                       reqObj.updatedVal = null;
                     }
                     try {
-                      _ws.send(JSON.stringify(retObj));
+                      sendInProtocol(_ws, retObj);
                     } catch (err) {
                       console.log('send failed: connection may be closed.');
                     }
@@ -1554,4 +1564,12 @@ function createAuthorizeSuccessResponse(reqId, ttl) {
 function createAuthorizeErrorResponse(reqId, err) {
   var retObj = {"action": "authorize", "requestId":reqId, "error":err};
   return retObj;
+}
+
+function sendInProtocol(ws, obj){
+  if (ws.protocol === 'wvss1.0_binary') {
+    ws.send(msgpack.encode(obj));
+  } else {
+    ws.send(JSON.stringify(obj));
+  }
 }
