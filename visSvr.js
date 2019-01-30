@@ -1167,7 +1167,7 @@ function dataReceiveHandler(message) {
                 reqObj.waiting = true;
                 reqObj.updatedVal = matchObj.value;
                 reqObj.updatedValTimestamp = matchObj.timestamp;
-                reqObj.waitId = setTimeout(function() {
+                reqObj.waitId = setTimeout((reqObj, retObj) => {
                   if (_ws != null) {
                     if (reqObj.updatedVal !== null) {
                       retObj.value = reqObj.updatedVal;
@@ -1184,7 +1184,7 @@ function dataReceiveHandler(message) {
                     reqObj.lastSendTimestamp = new Date().getTime();
                     reqObj.waiting = false;
                   }
-                }, ret.waitTime);
+                }, ret.waitTime, reqObj, retObj);
               } else {
                 reqObj.updatedVal = matchObj.value;
                 reqObj.updatedValTimestamp = matchObj.timestamp;
