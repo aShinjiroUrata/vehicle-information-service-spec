@@ -1249,10 +1249,9 @@ function shouldPassFilters(reqObj, matchObj) {
   if (!_.isUndefined(interval)) {
     const elapsed = new Date().getTime() - reqObj.lastSendTimestamp;
     if (elapsed < interval) {
-      if ((!_.isUndefined(onChange) && onChange) && (matchObj.value !== reqObj.lastVal)) {
-        return {action: FILTER_PASS};
+      if((_.isUndefined(onChange) || !onChange) || (matchObj.value === reqObj.lastVal)){
+        return {action: FILTER_DELAY, waitTime: (interval - elapsed)};
       }
-      return {action: FILTER_DELAY, waitTime: (interval - elapsed)};
     }
   }
 
