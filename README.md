@@ -23,7 +23,7 @@ cd vehicle-information-service-spec`
 2.Install npm packages
 ```
 $npm install fs http ws websocket socket.io socket.io-client
-$npm install -g http-server forever
+$npm install -g http-server forever debug
 ```
 3.Edit `svr_config.js`
 - Default IP address for VISS prototype is '127.0.0.1'. <br>
@@ -49,7 +49,7 @@ $./start.sh`
 
 5.Open test-ui WebApp by browser with below url
 ```
-http://{VISS_IP}:8081/test-ui.html
+http://{VISS_IP}:8081/viss_test.html
 ```
 6.stop VISS server, mock data source server, node's web server
 ```
